@@ -276,14 +276,20 @@ router.post('/:id/upload-audio', async (req, res) => {
       uploadDir: UPLOADS_DIR,
       keepExtensions: true,
       maxFileSize: 100 * 1024 * 1024, // 100MB
-      filter: ({ mimetype }) => {
-        // Aceitar apenas arquivos de áudio
-        return mimetype?.startsWith('audio/') || false
+      filter: ({ mimetype, name }) => {
+        // Aceitar arquivos de áudio por mimetype ou extensão
+        // Alguns navegadores mobile podem não enviar mimetype correto
+        const isAudioMimetype = mimetype?.startsWith('audio/') || mimetype?.startsWith('video/webm')
+        const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.webm', '.mpeg', '.mp4', '.aac', '.flac']
+        const hasAudioExtension = name ? audioExtensions.some(ext => name.toLowerCase().endsWith(ext)) : false
+
+        return isAudioMimetype || hasAudioExtension
       },
     })
 
-    form.parse(req, async (err, fields, files) => {
+    form.parse(req, async (err, _fields, files) => {
       if (err) {
+        console.error('[Upload Áudio] Erro ao processar upload:', err)
         return res.status(400).json({ error: 'Erro ao processar upload', message: err.message })
       }
 
@@ -291,8 +297,16 @@ router.post('/:id/upload-audio', async (req, res) => {
         const audioFile = Array.isArray(files.audio) ? files.audio[0] : files.audio
 
         if (!audioFile) {
+          console.error('[Upload Áudio] Nenhum arquivo recebido. Files recebidos:', Object.keys(files))
           return res.status(400).json({ error: 'Arquivo de áudio é obrigatório' })
         }
+
+        console.log('[Upload Áudio] Arquivo recebido:', {
+          name: audioFile.originalFilename,
+          size: audioFile.size,
+          mimetype: audioFile.mimetype,
+          path: audioFile.filepath,
+        })
 
         const audioRecord = await prisma.consultationAudio.create({
           data: {
