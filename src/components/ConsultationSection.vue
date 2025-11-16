@@ -149,9 +149,19 @@ async function createConsultation() {
 
 async function uploadAudio(consultationId: string, file: File) {
   uploadingAudio.value = true
+
+  console.log('[Upload Áudio] Iniciando upload:', {
+    fileName: file.name,
+    fileType: file.type,
+    fileSize: file.size,
+    consultationId,
+  })
+
   try {
     const formData = new FormData()
     formData.append('audio', file)
+
+    console.log('[Upload Áudio] FormData criado, enviando para API...')
 
     const response = await axios.post(
       `/api/consultations/${consultationId}/upload-audio`,
@@ -160,15 +170,19 @@ async function uploadAudio(consultationId: string, file: File) {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 60000, // 60 segundos de timeout
       }
     )
 
+    console.log('[Upload Áudio] Resposta recebida:', response.data)
     alert(response.data?.message || 'Áudio enviado! Transcrição em andamento...')
 
     await fetchConsultations()
   } catch (error: any) {
-    console.error('Erro ao fazer upload de áudio:', error)
-    alert('Erro ao enviar áudio: ' + error.message)
+    console.error('[Upload Áudio] Erro completo:', error)
+    console.error('[Upload Áudio] Erro response:', error.response?.data)
+    const errorMsg = error.response?.data?.error || error.message || 'Erro desconhecido'
+    alert('Erro ao enviar áudio: ' + errorMsg)
   } finally {
     uploadingAudio.value = false
   }
@@ -176,8 +190,19 @@ async function uploadAudio(consultationId: string, file: File) {
 
 function handleAudioFileSelected(event: Event, consultationId: string) {
   const input = event.target as HTMLInputElement
+  console.log('[Upload Áudio] Arquivo selecionado:', input.files)
+
   if (input.files && input.files[0]) {
-    uploadAudio(consultationId, input.files[0])
+    const file = input.files[0]
+    console.log('[Upload Áudio] Detalhes do arquivo:', {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      lastModified: new Date(file.lastModified).toISOString(),
+    })
+    uploadAudio(consultationId, file)
+  } else {
+    console.warn('[Upload Áudio] Nenhum arquivo foi selecionado')
   }
 }
 
@@ -697,7 +722,7 @@ function dismissRecordingError() {
             <input
               :ref="`audioInput-${consultation.id}`"
               type="file"
-              accept="audio/*"
+              accept="audio/*,audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/m4a,audio/aac,video/webm"
               style="display: none"
               @change="(e) => handleAudioFileSelected(e, consultation.id)"
             />
