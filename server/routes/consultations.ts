@@ -7,10 +7,14 @@ import { transcribeAudio } from '../services/audio-transcription.js'
 
 const router = Router()
 
-const UPLOADS_DIR = path.join(process.cwd(), 'uploads', 'consultations')
+// Usar /tmp em ambientes serverless (Vercel), ou uploads/ localmente
+const isVercel = process.env.VERCEL === '1'
+const UPLOADS_DIR = isVercel
+  ? path.join('/tmp', 'uploads', 'consultations')
+  : path.join(process.cwd(), 'uploads', 'consultations')
 
-// DESABILITADO: Não criar diretórios em ambientes serverless (Vercel)
-// fs.mkdir(UPLOADS_DIR, { recursive: true }).catch(console.error)
+// Criar diretório se não existir
+fs.mkdir(UPLOADS_DIR, { recursive: true }).catch(console.error)
 
 /**
  * @swagger

@@ -14,19 +14,22 @@ const router = Router()
  *   description: Gerenciamento de exames laboratoriais
  */
 
-// Diretório para salvar uploads
-// NOTA: Na Vercel, usar /tmp ou Vercel Blob Storage para uploads
-const UPLOADS_DIR = path.join(process.cwd(), 'uploads')
+// Usar /tmp em ambientes serverless (Vercel), ou uploads/ localmente
+const isVercel = process.env.VERCEL === '1'
+const UPLOADS_DIR = isVercel
+  ? path.join('/tmp', 'uploads')
+  : path.join(process.cwd(), 'uploads')
 
-// DESABILITADO: Não criar diretórios em ambientes serverless (Vercel)
-// async function ensureUploadsDir() {
-//   try {
-//     await fs.access(UPLOADS_DIR)
-//   } catch {
-//     await fs.mkdir(UPLOADS_DIR, { recursive: true })
-//   }
-// }
-// ensureUploadsDir()
+// Criar diretório de uploads se não existir
+async function ensureUploadsDir() {
+  try {
+    await fs.access(UPLOADS_DIR)
+  } catch {
+    await fs.mkdir(UPLOADS_DIR, { recursive: true })
+  }
+}
+
+ensureUploadsDir()
 
 /**
  * @swagger
