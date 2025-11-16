@@ -1,11 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../lib/prisma'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
-
-const prisma = new PrismaClient()
 
 export interface ReportData {
   patientInfo: {

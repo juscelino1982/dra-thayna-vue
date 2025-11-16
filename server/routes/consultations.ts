@@ -1,12 +1,11 @@
 import { Router } from 'express'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../lib/prisma'
 import formidable from 'formidable'
 import fs from 'fs/promises'
 import path from 'path'
 import { transcribeAudio } from '../services/audio-transcription'
 
 const router = Router()
-const prisma = new PrismaClient()
 
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads', 'consultations')
 
