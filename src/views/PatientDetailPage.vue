@@ -756,7 +756,46 @@ function getExamActionLabel(status: string) {
                         <v-icon icon="mdi-text-long" class="mr-2" color="primary-darken-1"></v-icon>
                         <span class="text-subtitle-2 font-weight-medium">Resumo da IA</span>
                       </div>
-                      <p class="mb-0 text-body-2">{{ exam.aiSummary }}</p>
+                      <p class="mb-3 text-body-2">{{ exam.aiSummary }}</p>
+
+                      <!-- Principais achados dentro do resumo -->
+                      <div v-if="ensureArray(exam.parsedKeyFindings).length" class="mt-4">
+                        <div class="d-flex align-center mb-2">
+                          <v-icon icon="mdi-lightbulb-on-outline" class="mr-2" color="primary"></v-icon>
+                          <span class="text-subtitle-2 font-weight-medium">Principais achados</span>
+                        </div>
+                        <v-list density="compact" class="exam-card__list bg-transparent">
+                          <v-list-item
+                            v-for="(finding, index) in ensureArray(exam.parsedKeyFindings)"
+                            :key="`${exam.id}-finding-${index}`"
+                            class="px-0"
+                          >
+                            <template #prepend>
+                              <v-icon icon="mdi-check-circle" size="18" color="primary"></v-icon>
+                            </template>
+                            <template #append>
+                              <v-chip
+                                v-if="getFindingStatusChip(finding)"
+                                size="small"
+                                :color="getValueStatusColor(getFindingStatusChip(finding))"
+                                variant="tonal"
+                                class="ml-2"
+                              >
+                                {{ getFindingStatusChip(finding) }}
+                              </v-chip>
+                            </template>
+                            <v-list-item-title class="text-body-2 font-weight-medium">
+                              {{ getFindingTitle(finding) }}
+                            </v-list-item-title>
+                            <v-list-item-subtitle
+                              v-if="getFindingSubtitle(finding)"
+                              class="text-caption text-grey-darken-1"
+                            >
+                              {{ getFindingSubtitle(finding) }}
+                            </v-list-item-subtitle>
+                          </v-list-item>
+                        </v-list>
+                      </div>
                     </v-sheet>
 
                     <v-alert
@@ -767,43 +806,6 @@ function getExamActionLabel(status: string) {
                     >
                       A IA não retornou um resumo para este exame. Consulte os dados extraídos nos detalhes abaixo.
                     </v-alert>
-
-                    <div v-if="ensureArray(exam.parsedKeyFindings).length" class="mb-4">
-                      <div class="d-flex align-center mb-2">
-                        <v-icon icon="mdi-lightbulb-on-outline" class="mr-2" color="primary"></v-icon>
-                        <span class="text-subtitle-2 font-weight-medium">Principais achados</span>
-                      </div>
-                      <v-list density="compact" class="exam-card__list">
-                        <v-list-item
-                          v-for="(finding, index) in ensureArray(exam.parsedKeyFindings)"
-                          :key="`${exam.id}-finding-${index}`"
-                        >
-                          <template #prepend>
-                            <v-icon icon="mdi-check-circle" size="18" color="primary"></v-icon>
-                          </template>
-                          <template #append>
-                            <v-chip
-                              v-if="getFindingStatusChip(finding)"
-                              size="small"
-                              :color="getValueStatusColor(getFindingStatusChip(finding))"
-                              variant="tonal"
-                              class="ml-2"
-                            >
-                              {{ getFindingStatusChip(finding) }}
-                            </v-chip>
-                          </template>
-                          <v-list-item-title class="text-body-2 font-weight-medium">
-                            {{ getFindingTitle(finding) }}
-                          </v-list-item-title>
-                          <v-list-item-subtitle
-                            v-if="getFindingSubtitle(finding)"
-                            class="text-caption text-grey-darken-1"
-                          >
-                            {{ getFindingSubtitle(finding) }}
-                          </v-list-item-subtitle>
-                        </v-list-item>
-                      </v-list>
-                    </div>
 
                     <div v-if="ensureArray(exam.parsedRecommendations).length" class="mb-4">
                       <div class="d-flex align-center mb-2">
