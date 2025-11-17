@@ -19,25 +19,43 @@ export interface TranscriptionResult {
 
 /**
  * Transcreve um arquivo de áudio usando OpenAI Whisper API
- * @param audioFilePath - Caminho completo do arquivo de áudio
+ * @param audioFilePathOrUrl - Caminho local ou URL do Vercel Blob
  * @returns Resultado da transcrição
  */
 export async function transcribeAudio(
-  audioFilePath: string
+  audioFilePathOrUrl: string
 ): Promise<TranscriptionResult> {
   try {
-    console.log(`[Transcrição] Iniciando transcrição do arquivo: ${audioFilePath}`)
+    console.log(`[Transcrição] Iniciando transcrição do arquivo: ${audioFilePathOrUrl}`)
 
-    // Verificar se o arquivo existe
-    const fileStats = await fs.stat(audioFilePath)
-    if (!fileStats.isFile()) {
-      throw new Error('Arquivo não encontrado')
+    let audioBuffer: Buffer
+    let fileName: string
+
+    // Verificar se é URL do Vercel Blob ou path local
+    if (audioFilePathOrUrl.startsWith('http://') || audioFilePathOrUrl.startsWith('https://')) {
+      console.log('[Transcrição] Baixando áudio do Vercel Blob...')
+      // URL do Vercel Blob - baixar
+      const response = await fetch(audioFilePathOrUrl)
+      if (!response.ok) {
+        throw new Error(`Erro ao baixar áudio: ${response.statusText}`)
+      }
+      const arrayBuffer = await response.arrayBuffer()
+      audioBuffer = Buffer.from(arrayBuffer)
+      fileName = audioFilePathOrUrl.split('/').pop() || 'audio.webm'
+    } else {
+      console.log('[Transcrição] Lendo áudio local...')
+      // Path local - ler
+      const fileStats = await fs.stat(audioFilePathOrUrl)
+      if (!fileStats.isFile()) {
+        throw new Error('Arquivo não encontrado')
+      }
+      audioBuffer = await fs.readFile(audioFilePathOrUrl)
+      fileName = path.basename(audioFilePathOrUrl)
     }
 
-    // Criar stream do arquivo
-    const audioStream = await fs.readFile(audioFilePath)
-    const file = new File([audioStream], path.basename(audioFilePath), {
-      type: getAudioMimeType(audioFilePath),
+    // Criar File object para OpenAI
+    const file = new File([new Uint8Array(audioBuffer)], fileName, {
+      type: getAudioMimeType(fileName),
     })
 
     // Chamar Whisper API
