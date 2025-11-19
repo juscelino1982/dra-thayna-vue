@@ -27,9 +27,10 @@ model User {
   updatedAt    DateTime @updatedAt
 
   // Relacionamentos
-  consultations Consultation[]
-  reports       Report[]
-  appointments  Appointment[]
+  consultations        Consultation[]
+  reports              Report[]
+  appointments         Appointment[]
+  calendarIntegrations CalendarIntegration[]
 
   @@map("users")
 }
@@ -377,6 +378,47 @@ model Exam {
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   @@map("exams")
+}
+
+// ====================================
+// INTEGRAÇÃO COM CALENDÁRIOS
+// ====================================
+
+model CalendarIntegration {
+  id     String @id @default(cuid())
+  userId String
+
+  // Tipo de Calendário
+  provider String // "google", "apple", "outlook"
+
+  // Autenticação OAuth
+  accessToken  String?
+  refreshToken String?
+  tokenExpiry  DateTime?
+
+  // Informações do Calendário
+  calendarId   String? // ID do calendário específico
+  calendarName String?
+  email        String? // Email associado
+
+  // Status
+  isActive     Boolean  @default(true)
+  lastSyncAt   DateTime?
+  syncStatus   String   @default("ACTIVE") // ACTIVE, ERROR, DISABLED
+  syncError    String?
+
+  // Configurações
+  autoSync     Boolean  @default(true)
+  syncInterval Int      @default(15) // minutos
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("calendar_integrations")
 }
 
 // ====================================

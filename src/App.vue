@@ -27,6 +27,11 @@ const drawer = ref(true)
           title="Pacientes"
           to="/pacientes"
         ></v-list-item>
+        <v-list-item
+          prepend-icon="mdi-calendar"
+          title="Calendário"
+          to="/calendario"
+        ></v-list-item>
       </v-list>
     </v-navigation-drawer>
 
