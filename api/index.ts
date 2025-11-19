@@ -8,6 +8,7 @@ import consultationsRouter from '../server/routes/consultations.js'
 import reportsRouter from '../server/routes/reports.js'
 import examsRouter from '../server/routes/exams.js'
 import dashboardRouter from '../server/routes/dashboard.js'
+import appointmentsRouter from '../server/routes/appointments.js'
 
 const app = express()
 
@@ -22,6 +23,7 @@ app.use('/api/consultations', consultationsRouter)
 app.use('/api/reports', reportsRouter)
 app.use('/api/exams', examsRouter)
 app.use('/api/dashboard', dashboardRouter)
+app.use('/api/appointments', appointmentsRouter)
 
 // Health check
 app.get('/api/health', (req, res) => {
