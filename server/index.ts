@@ -8,6 +8,8 @@ import consultationsRouter from './routes/consultations'
 import reportsRouter from './routes/reports'
 import dashboardRouter from './routes/dashboard'
 import appointmentsRouter from './routes/appointments'
+import calendarRouter from './routes/calendar'
+import { ensureDefaultUser } from './utils/ensure-default-user'
 
 const app = express()
 const PORT = 3001
@@ -69,6 +71,7 @@ app.use('/api/exams', examsRouter)
 app.use('/api/consultations', consultationsRouter)
 app.use('/api/reports', reportsRouter)
 app.use('/api/appointments', appointmentsRouter)
+app.use('/api/calendar', calendarRouter)
 
 // 404 Handler
 app.use((req, res) => {
@@ -87,9 +90,22 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   })
 })
 
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`)
-  console.log(`📊 Health check: http://localhost:${PORT}/health`)
-  console.log(`📚 Documentação Swagger: http://localhost:${PORT}/api-docs`)
-  console.log(`📄 OpenAPI JSON: http://localhost:${PORT}/api-docs.json`)
-})
+// Inicializa o servidor
+async function startServer() {
+  try {
+    // Garante que existe um usuário padrão
+    await ensureDefaultUser()
+
+    app.listen(PORT, () => {
+      console.log(`🚀 Servidor rodando em http://localhost:${PORT}`)
+      console.log(`📊 Health check: http://localhost:${PORT}/health`)
+      console.log(`📚 Documentação Swagger: http://localhost:${PORT}/api-docs`)
+      console.log(`📄 OpenAPI JSON: http://localhost:${PORT}/api-docs.json`)
+    })
+  } catch (error) {
+    console.error('❌ Erro ao iniciar servidor:', error)
+    process.exit(1)
+  }
+}
+
+startServer()
