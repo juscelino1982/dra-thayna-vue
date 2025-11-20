@@ -1,7 +1,12 @@
+import OpenAI from 'openai'
 import fs from 'fs/promises'
+import fsSync from 'fs'
 import path from 'path'
-import FormData from 'form-data'
-import { Readable } from 'stream'
+import os from 'os'
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+})
 
 export interface TranscriptionResult {
   text: string
@@ -96,97 +101,68 @@ export async function transcribeAudio(
       bufferSizeKB: (audioBuffer.length / 1024).toFixed(2),
     })
 
-    // WORKAROUND: Usar Blob ao invés de File para melhor compatibilidade
-    // File object às vezes causa problemas com certos formatos de áudio mobile
-    const uint8Array = new Uint8Array(audioBuffer)
-    const blob = new Blob([uint8Array], { type: mimeType })
-    const file = new File([blob], fileName, {
-      type: mimeType,
-    })
+    // WORKAROUND: Salvar arquivo temporariamente para usar SDK OpenAI
+    // O SDK funciona melhor com arquivos no disco do que com streams/buffers
+    const tempDir = os.tmpdir()
+    const tempFilePath = path.join(tempDir, `whisper-${Date.now()}-${fileName}`)
 
-    console.log(`[Transcrição] File criado:`, {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-    })
+    console.log(`[Transcrição] Salvando arquivo temporário: ${tempFilePath}`)
+    await fs.writeFile(tempFilePath, audioBuffer)
 
-    // Chamar Whisper API com retry
+    // Chamar Whisper API com retry usando SDK
     const startTime = Date.now()
     let transcription: any = null
     let lastError: Error | null = null
     const maxRetries = 3
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`[Transcrição] Tentativa ${attempt}/${maxRetries} de chamada à API OpenAI Whisper...`)
+    try {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`[Transcrição] Tentativa ${attempt}/${maxRetries} de chamada à API OpenAI Whisper...`)
 
-        // WORKAROUND: Usar FormData e fetch diretamente ao invés do SDK OpenAI
-        // O SDK pode ter problemas com arquivos mobile em ambiente serverless
-        const formData = new FormData()
+          // Usar a API de transcrição diretamente com stream do arquivo
+          transcription = await openai.audio.transcriptions.create({
+            file: fsSync.createReadStream(tempFilePath) as any,
+            model: 'whisper-1',
+            language: 'pt',
+            response_format: 'verbose_json',
+            temperature: 0.2,
+          })
 
-        // Criar stream a partir do buffer para FormData
-        const audioStream = Readable.from(audioBuffer)
+          console.log(`[Transcrição] ✅ API OpenAI respondeu com sucesso na tentativa ${attempt}`)
+          break // Sucesso, sair do loop
 
-        formData.append('file', audioStream, {
-          filename: fileName,
-          contentType: mimeType,
-          knownLength: audioBuffer.length,
-        })
-        formData.append('model', 'whisper-1')
-        formData.append('language', 'pt')
-        formData.append('response_format', 'verbose_json')
-        formData.append('temperature', '0.2')
+        } catch (error: any) {
+          lastError = error
+          console.error(`[Transcrição] ❌ Erro na tentativa ${attempt}:`, {
+            message: error.message,
+            code: error.code,
+            type: error.type,
+            status: error.status,
+            name: error.name,
+          })
 
-        console.log(`[Transcrição] FormData criado com ${formData.getLengthSync()} bytes`)
-
-        // Timeout de 120 segundos para cada tentativa
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 120000)
-
-        const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-            ...formData.getHeaders(),
-          },
-          body: formData as any,
-          signal: controller.signal,
-        })
-
-        clearTimeout(timeoutId)
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          throw new Error(`OpenAI API error (${response.status}): ${errorText}`)
-        }
-
-        transcription = await response.json()
-
-        console.log(`[Transcrição] ✅ API OpenAI respondeu com sucesso na tentativa ${attempt}`)
-        break // Sucesso, sair do loop
-
-      } catch (error: any) {
-        lastError = error
-        console.error(`[Transcrição] ❌ Erro na tentativa ${attempt}:`, {
-          message: error.message,
-          code: error.code,
-          type: error.type,
-          status: error.status,
-          name: error.name,
-        })
-
-        if (attempt < maxRetries) {
-          const delay = attempt * 2000 // 2s, 4s, 6s
-          console.log(`[Transcrição] Aguardando ${delay}ms antes de tentar novamente...`)
-          await new Promise(resolve => setTimeout(resolve, delay))
+          if (attempt < maxRetries) {
+            const delay = attempt * 2000 // 2s, 4s, 6s
+            console.log(`[Transcrição] Aguardando ${delay}ms antes de tentar novamente...`)
+            await new Promise(resolve => setTimeout(resolve, delay))
+          }
         }
       }
-    }
 
-    if (!transcription) {
-      throw new Error(
-        `Falha ao chamar OpenAI Whisper após ${maxRetries} tentativas: ${lastError?.message || 'Erro desconhecido'}`
-      )
+      if (!transcription) {
+        throw new Error(
+          `Falha ao chamar OpenAI Whisper após ${maxRetries} tentativas: ${lastError?.message || 'Erro desconhecido'}`
+        )
+      }
+    } finally {
+      // Sempre deletar arquivo temporário
+      try {
+        await fs.unlink(tempFilePath)
+        console.log(`[Transcrição] Arquivo temporário deletado`)
+      } catch (err) {
+        console.warn(`[Transcrição] Erro ao deletar arquivo temporário:`, err)
+      }
     }
 
     const duration = Date.now() - startTime
