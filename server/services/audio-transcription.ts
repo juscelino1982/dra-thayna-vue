@@ -1,4 +1,4 @@
-import OpenAI, { toFile } from 'openai'
+import OpenAI from 'openai'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -99,17 +99,18 @@ export async function transcribeAudio(
       bufferSizeKB: (audioBuffer.length / 1024).toFixed(2),
     })
 
-    // WORKAROUND: Usar toFile do SDK OpenAI para criar arquivo compatível
-    // toFile() é a maneira oficial do SDK OpenAI para lidar com uploads
-    const file = await toFile(audioBuffer, fileName, { type: mimeType })
-
-    console.log(`[Transcrição] Arquivo criado com toFile():`, {
-      name: fileName,
-      size: audioBuffer.length,
+    // Criar File object simples - código que funcionava antes
+    const file = new File([new Uint8Array(audioBuffer)], fileName, {
       type: mimeType,
     })
 
-    // Chamar Whisper API com retry usando SDK
+    console.log(`[Transcrição] File criado:`, {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    })
+
+    // Chamar Whisper API (mantendo retry por segurança)
     const startTime = Date.now()
     let transcription: any = null
     let lastError: Error | null = null
@@ -119,7 +120,6 @@ export async function transcribeAudio(
       try {
         console.log(`[Transcrição] Tentativa ${attempt}/${maxRetries} de chamada à API OpenAI Whisper...`)
 
-        // Usar a API de transcrição com toFile
         transcription = await openai.audio.transcriptions.create({
           file: file,
           model: 'whisper-1',
