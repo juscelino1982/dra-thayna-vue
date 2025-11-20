@@ -1,8 +1,6 @@
-import OpenAI from 'openai'
+import OpenAI, { toFile } from 'openai'
 import fs from 'fs/promises'
-import fsSync from 'fs'
 import path from 'path'
-import os from 'os'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -101,13 +99,15 @@ export async function transcribeAudio(
       bufferSizeKB: (audioBuffer.length / 1024).toFixed(2),
     })
 
-    // WORKAROUND: Salvar arquivo temporariamente para usar SDK OpenAI
-    // O SDK funciona melhor com arquivos no disco do que com streams/buffers
-    const tempDir = os.tmpdir()
-    const tempFilePath = path.join(tempDir, `whisper-${Date.now()}-${fileName}`)
+    // WORKAROUND: Usar toFile do SDK OpenAI para criar arquivo compatível
+    // toFile() é a maneira oficial do SDK OpenAI para lidar com uploads
+    const file = await toFile(audioBuffer, fileName, { type: mimeType })
 
-    console.log(`[Transcrição] Salvando arquivo temporário: ${tempFilePath}`)
-    await fs.writeFile(tempFilePath, audioBuffer)
+    console.log(`[Transcrição] Arquivo criado com toFile():`, {
+      name: fileName,
+      size: audioBuffer.length,
+      type: mimeType,
+    })
 
     // Chamar Whisper API com retry usando SDK
     const startTime = Date.now()
@@ -115,54 +115,44 @@ export async function transcribeAudio(
     let lastError: Error | null = null
     const maxRetries = 3
 
-    try {
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          console.log(`[Transcrição] Tentativa ${attempt}/${maxRetries} de chamada à API OpenAI Whisper...`)
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[Transcrição] Tentativa ${attempt}/${maxRetries} de chamada à API OpenAI Whisper...`)
 
-          // Usar a API de transcrição diretamente com stream do arquivo
-          transcription = await openai.audio.transcriptions.create({
-            file: fsSync.createReadStream(tempFilePath) as any,
-            model: 'whisper-1',
-            language: 'pt',
-            response_format: 'verbose_json',
-            temperature: 0.2,
-          })
+        // Usar a API de transcrição com toFile
+        transcription = await openai.audio.transcriptions.create({
+          file: file,
+          model: 'whisper-1',
+          language: 'pt',
+          response_format: 'verbose_json',
+          temperature: 0.2,
+        })
 
-          console.log(`[Transcrição] ✅ API OpenAI respondeu com sucesso na tentativa ${attempt}`)
-          break // Sucesso, sair do loop
+        console.log(`[Transcrição] ✅ API OpenAI respondeu com sucesso na tentativa ${attempt}`)
+        break // Sucesso, sair do loop
 
-        } catch (error: any) {
-          lastError = error
-          console.error(`[Transcrição] ❌ Erro na tentativa ${attempt}:`, {
-            message: error.message,
-            code: error.code,
-            type: error.type,
-            status: error.status,
-            name: error.name,
-          })
+      } catch (error: any) {
+        lastError = error
+        console.error(`[Transcrição] ❌ Erro na tentativa ${attempt}:`, {
+          message: error.message,
+          code: error.code,
+          type: error.type,
+          status: error.status,
+          name: error.name,
+        })
 
-          if (attempt < maxRetries) {
-            const delay = attempt * 2000 // 2s, 4s, 6s
-            console.log(`[Transcrição] Aguardando ${delay}ms antes de tentar novamente...`)
-            await new Promise(resolve => setTimeout(resolve, delay))
-          }
+        if (attempt < maxRetries) {
+          const delay = attempt * 2000 // 2s, 4s, 6s
+          console.log(`[Transcrição] Aguardando ${delay}ms antes de tentar novamente...`)
+          await new Promise(resolve => setTimeout(resolve, delay))
         }
       }
+    }
 
-      if (!transcription) {
-        throw new Error(
-          `Falha ao chamar OpenAI Whisper após ${maxRetries} tentativas: ${lastError?.message || 'Erro desconhecido'}`
-        )
-      }
-    } finally {
-      // Sempre deletar arquivo temporário
-      try {
-        await fs.unlink(tempFilePath)
-        console.log(`[Transcrição] Arquivo temporário deletado`)
-      } catch (err) {
-        console.warn(`[Transcrição] Erro ao deletar arquivo temporário:`, err)
-      }
+    if (!transcription) {
+      throw new Error(
+        `Falha ao chamar OpenAI Whisper após ${maxRetries} tentativas: ${lastError?.message || 'Erro desconhecido'}`
+      )
     }
 
     const duration = Date.now() - startTime
