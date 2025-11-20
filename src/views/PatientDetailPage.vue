@@ -260,7 +260,17 @@ async function updateProcessingStatus(examId: string, patientId: string) {
     }
   } catch (error: any) {
     console.error('Erro ao atualizar status do exame:', error)
-    processingError.value = error.message || 'Erro ao consultar status do exame.'
+
+    // Se for 404, o exame não existe mais - parar monitoramento
+    if (error.response?.status === 404 || error.message?.includes('404')) {
+      console.warn(`Exame ${examId} não encontrado. Parando monitoramento.`)
+      processingError.value = 'Exame não encontrado.'
+      processingStatus.value = 'FAILED'
+      stopExamProcessingMonitor()
+      await store.fetchPatient(patientId)
+    } else {
+      processingError.value = error.message || 'Erro ao consultar status do exame.'
+    }
   }
 }
 
