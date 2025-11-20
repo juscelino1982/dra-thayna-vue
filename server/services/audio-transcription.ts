@@ -1,6 +1,7 @@
 import fs from 'fs/promises'
 import path from 'path'
 import FormData from 'form-data'
+import { Readable } from 'stream'
 
 export interface TranscriptionResult {
   text: string
@@ -123,9 +124,13 @@ export async function transcribeAudio(
         // O SDK pode ter problemas com arquivos mobile em ambiente serverless
         const formData = new FormData()
 
-        formData.append('file', audioBuffer, {
+        // Criar stream a partir do buffer para FormData
+        const audioStream = Readable.from(audioBuffer)
+
+        formData.append('file', audioStream, {
           filename: fileName,
           contentType: mimeType,
+          knownLength: audioBuffer.length,
         })
         formData.append('model', 'whisper-1')
         formData.append('language', 'pt')
