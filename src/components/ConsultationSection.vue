@@ -20,6 +20,7 @@ const recordingDuration = ref(0)
 const isRecording = ref(false)
 const isPaused = ref(false)
 const recordingError = ref<string | null>(null)
+const recordingErrorDetails = ref<any>(null)
 const recordedBlob = ref<Blob | null>(null)
 const recordingPreviewUrl = ref<string | null>(null)
 
@@ -330,6 +331,13 @@ async function startRecording() {
   recordingError.value = null
 
   if (!currentRecordingConsultation.value) {
+    const errorMsg = 'Nenhuma consulta selecionada'
+    recordingError.value = errorMsg
+    recordingErrorDetails.value = {
+      type: 'NO_CONSULTATION',
+      message: errorMsg,
+      timestamp: new Date().toISOString()
+    }
     alert('❌ Erro: Nenhuma consulta selecionada')
     return
   }
@@ -337,6 +345,18 @@ async function startRecording() {
   if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
     const errorMsg = 'Gravação não suportada neste navegador.'
     recordingError.value = errorMsg
+    recordingErrorDetails.value = {
+      type: 'UNSUPPORTED_BROWSER',
+      message: errorMsg,
+      navigator: typeof navigator !== 'undefined' ? {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        language: navigator.language,
+        hasMediaDevices: !!navigator.mediaDevices,
+        hasGetUserMedia: !!(navigator.mediaDevices?.getUserMedia)
+      } : null,
+      timestamp: new Date().toISOString()
+    }
     alert(`❌ ${errorMsg}\n\nDispositivo: ${navigator.userAgent}`)
     return
   }
@@ -395,6 +415,14 @@ async function startRecording() {
     mediaRecorder.onerror = event => {
       const errorMsg = `Erro na gravação: ${event.error?.message || event.error?.name || 'desconhecido'}`
       recordingError.value = errorMsg
+      recordingErrorDetails.value = {
+        type: 'MEDIARECORDER_ERROR',
+        message: event.error?.message || 'desconhecido',
+        name: event.error?.name || 'unknown',
+        eventType: event.type,
+        error: event.error,
+        timestamp: new Date().toISOString()
+      }
       alert(`❌ ERRO DURANTE A GRAVAÇÃO\n\n${errorMsg}\n\nErro: ${JSON.stringify(event.error)}`)
       resetRecordingState()
     }
@@ -462,6 +490,16 @@ async function startRecording() {
     console.error('Erro ao iniciar gravação:', error)
     const errorMsg = 'Não foi possível acessar o microfone: ' + (error.message || 'desconhecido')
     recordingError.value = errorMsg
+    recordingErrorDetails.value = {
+      type: 'RECORDING_START_ERROR',
+      message: error.message || 'desconhecido',
+      name: error.name || 'unknown',
+      code: error.code || null,
+      constraint: error.constraint || null,
+      stack: error.stack || null,
+      fullError: JSON.parse(JSON.stringify(error, Object.getOwnPropertyNames(error))),
+      timestamp: new Date().toISOString()
+    }
     alert(`❌ ERRO NA GRAVAÇÃO\n\n${errorMsg}\n\nNome do erro: ${error.name || 'desconhecido'}\nCódigo: ${error.code || 'N/A'}`)
     resetRecordingState()
   }
@@ -495,6 +533,13 @@ async function uploadRecordedAudio() {
   if (!recordedBlob.value || !currentRecordingConsultation.value) {
     const errorMsg = 'Nenhum áudio gravado para enviar.'
     recordingError.value = errorMsg
+    recordingErrorDetails.value = {
+      type: 'NO_AUDIO_TO_UPLOAD',
+      message: errorMsg,
+      hasBlob: !!recordedBlob.value,
+      hasConsultation: !!currentRecordingConsultation.value,
+      timestamp: new Date().toISOString()
+    }
     alert(`❌ ${errorMsg}`)
     return
   }
@@ -532,6 +577,17 @@ async function uploadRecordedAudio() {
     console.error('Stack:', error.stack)
     const errorDetails = error.response?.data?.message || error.message || 'desconhecido'
     recordingError.value = `Erro ao enviar áudio: ${errorDetails}`
+    recordingErrorDetails.value = {
+      type: 'UPLOAD_ERROR',
+      message: error.message || 'desconhecido',
+      httpStatus: error.response?.status || null,
+      httpStatusText: error.response?.statusText || null,
+      responseData: error.response?.data || null,
+      code: error.code || null,
+      name: error.name || 'unknown',
+      stack: error.stack || null,
+      timestamp: new Date().toISOString()
+    }
     recordingState.value = 'review'
 
     alert(`❌ ERRO NO UPLOAD\n\n${errorDetails}\n\nStatus HTTP: ${error.response?.status || 'N/A'}\nCódigo: ${error.code || 'N/A'}`)
@@ -573,6 +629,16 @@ onBeforeUnmount(() => {
 
 function dismissRecordingError() {
   recordingError.value = null
+  recordingErrorDetails.value = null
+}
+
+function showDetailedError() {
+  if (recordingErrorDetails.value) {
+    const details = recordingErrorDetails.value
+    alert(`🔍 DETALHES DO ERRO\n\n${JSON.stringify(details, null, 2)}`)
+  } else if (recordingError.value) {
+    alert(`⚠️ Erro:\n\n${recordingError.value}\n\n(Sem detalhes adicionais capturados)`)
+  }
 }
 
 function openTranscriptionModal(audio: any, consultationId: string) {
@@ -632,8 +698,15 @@ function closeTranscriptionModal() {
         class="mx-4 mt-4"
         closable
         @click:close="dismissRecordingError"
+        @click="showDetailedError"
+        style="cursor: pointer;"
       >
-        {{ recordingError }}
+        <div>
+          <strong>{{ recordingError }}</strong>
+          <div class="text-caption mt-2">
+            👆 Clique aqui para ver detalhes do erro
+          </div>
+        </div>
       </v-alert>
 
       <v-list>
