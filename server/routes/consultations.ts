@@ -543,12 +543,29 @@ async function processAudioTranscription(audioId: string, audioFilePath: string)
     console.log(`[audio:${audioId}] Processamento completo!`)
   } catch (error: any) {
     console.error(`[audio:${audioId}] Erro na transcrição:`, error)
+    console.error(`[audio:${audioId}] Erro detalhado:`, {
+      message: error.message,
+      code: error.code,
+      type: error.type,
+      status: error.status,
+      name: error.name,
+      stack: error.stack?.split('\n').slice(0, 3).join('\n'), // Primeiras 3 linhas do stack
+    })
+
+    // Criar mensagem de erro mais detalhada
+    let errorMessage = error.message || 'Erro desconhecido'
+    if (error.code) {
+      errorMessage = `[${error.code}] ${errorMessage}`
+    }
+    if (error.status) {
+      errorMessage = `${errorMessage} (HTTP ${error.status})`
+    }
 
     await prisma.consultationAudio.update({
       where: { id: audioId },
       data: {
         transcriptionStatus: 'FAILED',
-        transcriptionError: error.message,
+        transcriptionError: errorMessage,
       },
     })
   }
