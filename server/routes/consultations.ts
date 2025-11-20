@@ -289,12 +289,15 @@ router.post('/:id/upload-audio', async (req, res) => {
     })
 
     form.parse(req, async (err, _fields, files) => {
+      console.log('[Upload Áudio] Parse iniciado')
+
       if (err) {
         console.error('[Upload Áudio] Erro ao processar upload:', err)
         return res.status(400).json({ error: 'Erro ao processar upload', message: err.message })
       }
 
       try {
+        console.log('[Upload Áudio] Parse concluído, processando arquivo...')
         const audioFile = Array.isArray(files.audio) ? files.audio[0] : files.audio
 
         if (!audioFile) {
@@ -310,15 +313,21 @@ router.post('/:id/upload-audio', async (req, res) => {
         })
 
         // Ler o arquivo como buffer
+        console.log('[Upload Áudio] Lendo buffer do arquivo...')
         const fileBuffer = await fs.readFile(audioFile.filepath)
+        console.log(`[Upload Áudio] Buffer lido: ${fileBuffer.length} bytes`)
 
         // Gerar nome único
         const uniqueFilename = generateUniqueFilename(audioFile.originalFilename || 'audio.webm')
+        console.log(`[Upload Áudio] Nome único gerado: ${uniqueFilename}`)
 
         // Upload para Vercel Blob ou sistema de arquivos local
+        console.log('[Upload Áudio] Enviando para storage...')
         const fileUrl = await uploadFile(fileBuffer, uniqueFilename, 'consultations')
+        console.log(`[Upload Áudio] Arquivo salvo: ${fileUrl}`)
 
         // Criar registro no banco
+        console.log('[Upload Áudio] Criando registro no banco...')
         const audioRecord = await prisma.consultationAudio.create({
           data: {
             consultationId: id,
@@ -328,27 +337,33 @@ router.post('/:id/upload-audio', async (req, res) => {
             transcriptionStatus: 'PROCESSING',
           },
         })
+        console.log(`[Upload Áudio] Registro criado com ID: ${audioRecord.id}`)
 
         // Limpar arquivo temporário
         try {
           await fs.unlink(audioFile.filepath)
+          console.log('[Upload Áudio] Arquivo temporário removido')
         } catch (unlinkError) {
           console.warn('Não foi possível deletar arquivo temporário:', unlinkError)
         }
 
-        // Iniciar transcrição em background
-        // Para Vercel Blob, precisamos baixar o arquivo primeiro
-        processAudioTranscription(audioRecord.id, fileUrl).catch((error) =>
-          console.error('Erro ao processar transcrição:', error)
-        )
-
+        // IMPORTANTE: Enviar resposta IMEDIATAMENTE antes de processar
+        console.log('[Upload Áudio] 📤 Enviando resposta ao cliente...')
         res.status(200).json({
           success: true,
           audio: audioRecord,
           message: 'Upload realizado com sucesso. Transcrição enviada para a OpenAI.',
         })
+        console.log('[Upload Áudio] ✅ Resposta enviada!')
+
+        // Iniciar transcrição em background DEPOIS de responder
+        console.log('[Upload Áudio] Iniciando transcrição em background...')
+        processAudioTranscription(audioRecord.id, fileUrl).catch((error) =>
+          console.error('Erro ao processar transcrição:', error)
+        )
       } catch (error: any) {
-        console.error('[Upload Áudio] Erro ao salvar áudio:', error)
+        console.error('[Upload Áudio] ❌ Erro ao salvar áudio:', error)
+        console.error('[Upload Áudio] Stack:', error.stack)
         res.status(500).json({ error: 'Erro ao salvar áudio', message: error.message })
       }
     })
