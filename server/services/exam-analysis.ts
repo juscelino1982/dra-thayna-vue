@@ -164,38 +164,165 @@ export async function analyzeExam(
     // Determinar media type dinamicamente
     const mediaType = resolveMediaType(filePathOrUrl, fileType);
 
-    // Prompt especializado para análise de exames
+    // Prompt especializado para análise COMPLETA de exames
     const prompt = `Você é um especialista em análise de exames laboratoriais e está ajudando a Dra. Thayná Marra, farmacêutica especializada em Análise do Sangue Vivo.
 
-Analise este exame laboratorial e extraia as seguintes informações:
+Analise este exame laboratorial de forma EXTREMAMENTE DETALHADA e extraia TODAS as informações visíveis no documento.
 
-1. **CATEGORIZAÇÃO:**
-   - Tipo de exame (Hemograma, Lipidograma, Hormônios, etc.)
-   - Subcategoria específica
-   - Data do exame (se visível)
+Retorne um JSON estruturado com a seguinte estrutura COMPLETA:
 
-2. **DADOS EXTRAÍDOS:**
-   - Todos os parâmetros e seus valores
-   - Valores de referência
-   - Unidades de medida
+{
+  "categorização": {
+    "tipo_exame": "Hemograma/Lipidograma/Hormônios/etc",
+    "subtipo": "Completo/Parcial/Específico",
+    "data_exame": "YYYY-MM-DD",
+    "data_coleta": "YYYY-MM-DD HH:mm",
+    "urgencia": "Normal/Urgente/STAT"
+  },
 
-3. **ACHADOS PRINCIPAIS:**
-   - Valores alterados (acima ou abaixo da referência)
-   - Valores críticos (se houver)
-   - Padrões importantes
+  "laboratorio": {
+    "nome": "Nome do laboratório",
+    "endereco": "Endereço completo",
+    "telefone": "Telefone",
+    "cnpj": "CNPJ",
+    "responsavel_tecnico": "Nome do RT",
+    "crf": "CRF do responsável",
+    "certificacoes": ["ISO", "PNCQ", etc]
+  },
 
-4. **RESUMO CLÍNICO:**
-   - Resumo geral do exame
-   - Interpretação dos achados
-   - Possíveis correlações clínicas
+  "paciente_exame": {
+    "nome": "Nome do paciente (se visível)",
+    "idade": "Idade no momento do exame",
+    "sexo": "M/F",
+    "data_nascimento": "YYYY-MM-DD"
+  },
 
-Retorne um JSON estruturado com todas essas informações.
+  "solicitante": {
+    "nome": "Médico solicitante",
+    "crm": "CRM",
+    "especialidade": "Especialidade"
+  },
 
-**IMPORTANTE:**
-- Seja preciso com números e unidades
-- Identifique claramente valores alterados
-- Use terminologia médica adequada
-- Se não conseguir ler algo, indique "Não identificado"`;
+  "metodologia": {
+    "tecnica": "Técnica utilizada",
+    "equipamento": "Modelo do equipamento",
+    "metodo": "Método analítico",
+    "interferencias": ["Hemólise", "Lipemia", "Icterícia"],
+    "observacoes_tecnicas": "Observações do laboratório"
+  },
+
+  "resultados": {
+    "serie_vermelha": {
+      "hemacias": {"valor": 0, "unidade": "milhões/mm³", "referencia": "4.5-5.9", "status": "NORMAL/ALTO/BAIXO/CRÍTICO"},
+      "hemoglobina": {"valor": 0, "unidade": "g/dL", "referencia": "", "status": ""},
+      "hematocrito": {"valor": 0, "unidade": "%", "referencia": "", "status": ""},
+      "vcm": {"valor": 0, "unidade": "fL", "referencia": "", "status": ""},
+      "hcm": {"valor": 0, "unidade": "pg", "referencia": "", "status": ""},
+      "chcm": {"valor": 0, "unidade": "g/dL", "referencia": "", "status": ""},
+      "rdw": {"valor": 0, "unidade": "%", "referencia": "", "status": ""}
+    },
+
+    "serie_branca": {
+      "leucocitos_totais": {"valor": 0, "unidade": "/mm³", "referencia": "", "status": ""},
+      "neutrofilos": {"valor": 0, "percentual": 0, "unidade": "/mm³", "referencia": "", "status": ""},
+      "linfocitos": {"valor": 0, "percentual": 0, "unidade": "/mm³", "referencia": "", "status": ""},
+      "monocitos": {"valor": 0, "percentual": 0, "unidade": "/mm³", "referencia": "", "status": ""},
+      "eosinofilos": {"valor": 0, "percentual": 0, "unidade": "/mm³", "referencia": "", "status": ""},
+      "basofilos": {"valor": 0, "percentual": 0, "unidade": "/mm³", "referencia": "", "status": ""},
+      "bastoes": {"valor": 0, "percentual": 0, "referencia": "", "status": ""},
+      "segmentados": {"valor": 0, "percentual": 0, "referencia": "", "status": ""}
+    },
+
+    "serie_plaquetaria": {
+      "plaquetas": {"valor": 0, "unidade": "/mm³", "referencia": "", "status": ""},
+      "vpm": {"valor": 0, "unidade": "fL", "referencia": "", "status": ""},
+      "pdw": {"valor": 0, "unidade": "%", "referencia": "", "status": ""}
+    },
+
+    "indices_derivados": {
+      "relacao_neutrofilos_linfocitos": {"valor": 0, "referencia": "", "interpretacao": ""},
+      "indice_plaquetas_linfocitos": {"valor": 0, "referencia": "", "interpretacao": ""}
+    },
+
+    "outros_parametros": {
+      // Adicione TODOS os outros parâmetros encontrados no exame
+      // Formato: "nome_parametro": {"valor": X, "unidade": "", "referencia": "", "status": ""}
+    }
+  },
+
+  "achados_principais": {
+    "valores_criticos": [
+      {"parametro": "", "valor": "", "gravidade": "CRÍTICO", "acao_recomendada": ""}
+    ],
+    "valores_alterados": [
+      {"parametro": "", "valor_encontrado": "", "referencia": "", "desvio": "+20%", "status": "ALTO/BAIXO", "significado_clinico": ""}
+    ],
+    "valores_limites": [
+      {"parametro": "", "valor": "", "observacao": "Próximo ao limite"}
+    ],
+    "padroes_identificados": [
+      "Anemia microcítica",
+      "Leucocitose com desvio à esquerda",
+      etc
+    ]
+  },
+
+  "interpretacao_clinica": {
+    "resumo_geral": "Resumo conciso do exame",
+    "status_geral": "Normal/Alterado/Crítico",
+    "serie_vermelha": {
+      "status": "Normal/Alterado",
+      "interpretacao": "Interpretação detalhada"
+    },
+    "serie_branca": {
+      "status": "Normal/Alterado",
+      "interpretacao": "Interpretação detalhada"
+    },
+    "serie_plaquetaria": {
+      "status": "Normal/Alterado",
+      "interpretacao": "Interpretação detalhada"
+    },
+    "correlacoes_clinicas": [
+      "Possível deficiência de ferro",
+      "Sugere processo infeccioso",
+      etc
+    ],
+    "hipoteses_diagnosticas": [
+      "Anemia ferropriva",
+      "Infecção bacteriana",
+      etc
+    ],
+    "recomendacoes": [
+      "Repetir hemograma em 30 dias",
+      "Investigar foco infeccioso",
+      "Solicitar dosagem de ferritina",
+      etc
+    ]
+  },
+
+  "observacoes_laboratorio": {
+    "interferencias_detectadas": ["Hemólise leve", etc],
+    "comentarios_analiticos": "Comentários do laboratório",
+    "restricoes_interpretacao": "Limitações na interpretação"
+  },
+
+  "metadados": {
+    "confianca_extracao": 0.95,
+    "campos_nao_identificados": ["lista de campos que não foi possível ler"],
+    "qualidade_imagem": "Boa/Regular/Ruim",
+    "legibilidade": "Alta/Média/Baixa"
+  }
+}
+
+**INSTRUÇÕES CRÍTICAS:**
+1. Extraia TODOS os valores numéricos visíveis no exame
+2. Preserve unidades de medida EXATAS
+3. Identifique TODOS os valores fora da referência
+4. Se um campo não estiver presente no exame, use null
+5. Seja EXTREMAMENTE preciso com números
+6. Identifique padrões clínicos relevantes
+7. Forneça interpretação clínica detalhada
+8. Liste TODAS as recomendações pertinentes`;
 
     // Fazer análise com Claude (suporta imagens e PDFs)
     const fileContent: any = fileType === 'pdf'
