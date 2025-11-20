@@ -301,6 +301,9 @@ function resetRecordingState() {
 }
 
 function openRecordingDialog(consultation: any) {
+  console.log('[DEBUG] Abrindo modal de gravação para consulta:', consultation.id)
+  alert(`🎬 Abrindo gravador de áudio\n\nConsulta ID: ${consultation.id}\nNavegador: ${navigator.userAgent.substring(0, 50)}...`)
+
   currentRecordingConsultation.value = {
     id: consultation.id,
     title: `${new Date(consultation.date).toLocaleDateString('pt-BR')} ${new Date(consultation.date).toLocaleTimeString('pt-BR', {

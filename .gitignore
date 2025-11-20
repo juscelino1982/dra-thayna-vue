@@ -30,3 +30,6 @@ chaves-de-api.md
 .vercel
 
 .vercel
+
+.vercel
+.env*.local
