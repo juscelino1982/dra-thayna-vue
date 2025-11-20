@@ -4,6 +4,8 @@ import path from 'path'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  timeout: 120000, // 2 minutos de timeout
+  maxRetries: 0, // Desabilitar retry automático do SDK (faremos manualmente)
 })
 
 export interface TranscriptionResult {
@@ -99,8 +101,18 @@ export async function transcribeAudio(
       bufferSizeKB: (audioBuffer.length / 1024).toFixed(2),
     })
 
-    const file = new File([new Uint8Array(audioBuffer)], fileName, {
+    // WORKAROUND: Usar Blob ao invés de File para melhor compatibilidade
+    // File object às vezes causa problemas com certos formatos de áudio mobile
+    const uint8Array = new Uint8Array(audioBuffer)
+    const blob = new Blob([uint8Array], { type: mimeType })
+    const file = new File([blob], fileName, {
       type: mimeType,
+    })
+
+    console.log(`[Transcrição] File criado:`, {
+      name: file.name,
+      size: file.size,
+      type: file.type,
     })
 
     // Chamar Whisper API com retry
