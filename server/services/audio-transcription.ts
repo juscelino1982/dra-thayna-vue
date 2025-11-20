@@ -121,7 +121,14 @@ export async function transcribeAudio(
       })),
     }
   } catch (error: any) {
-    console.error('[Transcrição] Erro:', error)
+    console.error('[Transcrição] ❌❌❌ ERRO COMPLETO ❌❌❌')
+    console.error('[Transcrição] Erro object:', error)
+    console.error('[Transcrição] Error.message:', error.message)
+    console.error('[Transcrição] Error.code:', error.code)
+    console.error('[Transcrição] Error.status:', error.status)
+    console.error('[Transcrição] Error.type:', error.type)
+    console.error('[Transcrição] Error.name:', error.name)
+    console.error('[Transcrição] Stack:', error.stack)
     throw new Error(`Erro ao transcrever áudio: ${error.message}`)
   }
 }
@@ -134,13 +141,19 @@ function getAudioMimeType(filePath: string): string {
   const mimeTypes: Record<string, string> = {
     '.mp3': 'audio/mpeg',
     '.mp4': 'audio/mp4',
-    '.m4a': 'audio/mp4',
+    '.m4a': 'audio/m4a',
     '.wav': 'audio/wav',
     '.webm': 'audio/webm',
     '.ogg': 'audio/ogg',
+    '.oga': 'audio/ogg',
+    '.opus': 'audio/opus',
+    '.flac': 'audio/flac',
     '.mpeg': 'audio/mpeg',
+    '.mpga': 'audio/mpeg',
+    '.3gp': 'audio/3gpp',
+    '.aac': 'audio/aac',
   }
-  return mimeTypes[ext] || 'audio/mpeg'
+  return mimeTypes[ext] || 'audio/webm' // Default para webm que é comum em browsers
 }
 
 /**
