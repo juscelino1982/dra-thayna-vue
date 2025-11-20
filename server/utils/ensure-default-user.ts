@@ -2,7 +2,7 @@
  * Utilitário para garantir que existe um usuário padrão no banco
  */
 
-import { prisma } from '../config/prisma'
+import { prisma } from '../lib/prisma.js'
 import bcrypt from 'bcryptjs'
 
 export async function ensureDefaultUser() {

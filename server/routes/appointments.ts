@@ -5,7 +5,7 @@
  */
 
 import express, { Request, Response } from 'express'
-import { prisma } from '../config/prisma.js'
+import { prisma } from '../lib/prisma.js'
 import { getDefaultUserId } from '../utils/ensure-default-user.js'
 
 const router = express.Router()
