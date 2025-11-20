@@ -90,72 +90,19 @@ export async function transcribeAudio(
       fileName = path.basename(audioFilePathOrUrl)
     }
 
-    // Criar File object para OpenAI
+    // Criar File object para OpenAI usando toFile() oficial
     const mimeType = getAudioMimeType(fileName)
-    console.log(`[Transcrição] Criando File object:`, {
-      fileName,
-      mimeType,
-      bufferSize: audioBuffer.length,
-      bufferSizeKB: (audioBuffer.length / 1024).toFixed(2),
-    })
+    const file = await toFile(audioBuffer, fileName, { type: mimeType })
 
-    // Usar toFile() do SDK OpenAI - maneira OFICIAL e CORRETA para Node.js
-    const file = await toFile(audioBuffer, fileName, {
-      type: mimeType, // ou contentType: mimeType
-    })
-
-    console.log(`[Transcrição] File criado com toFile():`, {
-      name: fileName,
-      size: audioBuffer.length,
-      type: mimeType,
-    })
-
-    // Chamar Whisper API (mantendo retry por segurança)
+    // Chamar Whisper API
     const startTime = Date.now()
-    let transcription: any = null
-    let lastError: Error | null = null
-    const maxRetries = 3
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`[Transcrição] Tentativa ${attempt}/${maxRetries} de chamada à API OpenAI Whisper...`)
-
-        transcription = await openai.audio.transcriptions.create({
-          file: file,
-          model: 'whisper-1',
-          language: 'pt',
-          response_format: 'verbose_json',
-          temperature: 0.2,
-        })
-
-        console.log(`[Transcrição] ✅ API OpenAI respondeu com sucesso na tentativa ${attempt}`)
-        break // Sucesso, sair do loop
-
-      } catch (error: any) {
-        lastError = error
-        console.error(`[Transcrição] ❌ Erro COMPLETO na tentativa ${attempt}:`, error)
-        console.error(`[Transcrição] ❌ Erro detalhado:`, {
-          message: error.message,
-          code: error.code,
-          type: error.type,
-          status: error.status,
-          name: error.name,
-          stack: error.stack?.substring(0, 500),
-        })
-
-        if (attempt < maxRetries) {
-          const delay = attempt * 2000 // 2s, 4s, 6s
-          console.log(`[Transcrição] Aguardando ${delay}ms antes de tentar novamente...`)
-          await new Promise(resolve => setTimeout(resolve, delay))
-        }
-      }
-    }
-
-    if (!transcription) {
-      throw new Error(
-        `Falha ao chamar OpenAI Whisper após ${maxRetries} tentativas: ${lastError?.message || 'Erro desconhecido'}`
-      )
-    }
+    const transcription = await openai.audio.transcriptions.create({
+      file: file,
+      model: 'whisper-1',
+      language: 'pt',
+      response_format: 'verbose_json',
+      temperature: 0.2,
+    })
 
     const duration = Date.now() - startTime
 
