@@ -327,11 +327,14 @@ async function startRecording() {
   recordingError.value = null
 
   if (!currentRecordingConsultation.value) {
+    alert('❌ Erro: Nenhuma consulta selecionada')
     return
   }
 
   if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-    recordingError.value = 'Gravação não suportada neste navegador.'
+    const errorMsg = 'Gravação não suportada neste navegador.'
+    recordingError.value = errorMsg
+    alert(`❌ ${errorMsg}\n\nDispositivo: ${navigator.userAgent}`)
     return
   }
 
@@ -341,6 +344,8 @@ async function startRecording() {
     recordingDuration.value = 0
     recordingState.value = 'preparing'
 
+    alert('🎤 Solicitando permissão do microfone...')
+
     mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
@@ -348,6 +353,8 @@ async function startRecording() {
         sampleRate: 44100
       }
     })
+
+    alert('✅ Microfone autorizado! Configurando gravação...')
 
     // Tentar diferentes codecs para compatibilidade móvel
     let options: MediaRecorderOptions = {}
@@ -360,15 +367,19 @@ async function startRecording() {
       ''
     ]
 
+    let selectedMimeType = ''
     for (const mimeType of mimeTypes) {
       if (mimeType === '' || MediaRecorder.isTypeSupported(mimeType)) {
         if (mimeType !== '') {
           options = { mimeType }
+          selectedMimeType = mimeType
         }
         console.log(`[Gravação] Usando MIME type: ${mimeType || 'padrão do navegador'}`)
         break
       }
     }
+
+    alert(`🎵 Codec selecionado: ${selectedMimeType || 'padrão do navegador'}\n\nIniciando gravação...`)
 
     mediaRecorder = new MediaRecorder(mediaStream, options)
 
@@ -379,7 +390,9 @@ async function startRecording() {
     }
 
     mediaRecorder.onerror = event => {
-      recordingError.value = `Erro na gravação: ${event.error?.message || event.error?.name || 'desconhecido'}`
+      const errorMsg = `Erro na gravação: ${event.error?.message || event.error?.name || 'desconhecido'}`
+      recordingError.value = errorMsg
+      alert(`❌ ERRO DURANTE A GRAVAÇÃO\n\n${errorMsg}\n\nErro: ${JSON.stringify(event.error)}`)
       resetRecordingState()
     }
 
@@ -444,7 +457,9 @@ async function startRecording() {
     mediaRecorder.start()
   } catch (error: any) {
     console.error('Erro ao iniciar gravação:', error)
-    recordingError.value = 'Não foi possível acessar o microfone: ' + (error.message || 'desconhecido')
+    const errorMsg = 'Não foi possível acessar o microfone: ' + (error.message || 'desconhecido')
+    recordingError.value = errorMsg
+    alert(`❌ ERRO NA GRAVAÇÃO\n\n${errorMsg}\n\nNome do erro: ${error.name || 'desconhecido'}\nCódigo: ${error.code || 'N/A'}`)
     resetRecordingState()
   }
 }
@@ -475,7 +490,9 @@ function discardRecording() {
 
 async function uploadRecordedAudio() {
   if (!recordedBlob.value || !currentRecordingConsultation.value) {
-    recordingError.value = 'Nenhum áudio gravado para enviar.'
+    const errorMsg = 'Nenhum áudio gravado para enviar.'
+    recordingError.value = errorMsg
+    alert(`❌ ${errorMsg}`)
     return
   }
 
@@ -503,6 +520,8 @@ async function uploadRecordedAudio() {
       blobType: recordedBlob.value.type
     })
 
+    alert(`📤 Enviando áudio...\n\nTamanho: ${(recordedBlob.value.size / 1024 / 1024).toFixed(2)} MB\nFormato: ${extension}\nTipo: ${mimeType}`)
+
     await uploadAudio(currentRecordingConsultation.value.id, file)
     closeRecordingDialog()
   } catch (error: any) {
@@ -511,6 +530,8 @@ async function uploadRecordedAudio() {
     const errorDetails = error.response?.data?.message || error.message || 'desconhecido'
     recordingError.value = `Erro ao enviar áudio: ${errorDetails}`
     recordingState.value = 'review'
+
+    alert(`❌ ERRO NO UPLOAD\n\n${errorDetails}\n\nStatus HTTP: ${error.response?.status || 'N/A'}\nCódigo: ${error.code || 'N/A'}`)
   }
 }
 
