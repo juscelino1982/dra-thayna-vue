@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { prisma } from '../lib/prisma.js'
-import formidable from 'formidable'
+import multer from 'multer'
 import fs from 'fs/promises'
 import path from 'path'
 import { transcribeAudio } from '../services/audio-transcription.js'
@@ -16,6 +16,30 @@ const UPLOADS_DIR = isVercel
 
 // Criar diretório se não existir
 fs.mkdir(UPLOADS_DIR, { recursive: true }).catch(console.error)
+
+// Configurar multer para upload
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      cb(null, UPLOADS_DIR)
+    },
+    filename: (_req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+      cb(null, uniqueSuffix + path.extname(file.originalname))
+    }
+  }),
+  limits: {
+    fileSize: 100 * 1024 * 1024 // 100MB
+  },
+  fileFilter: (_req, file, cb) => {
+    const isAudio = file.mimetype.startsWith('audio/') || file.mimetype === 'video/webm'
+    if (isAudio) {
+      cb(null, true)
+    } else {
+      cb(new Error('Apenas arquivos de áudio são permitidos'))
+    }
+  }
+})
 
 /**
  * @swagger
@@ -261,114 +285,87 @@ router.post('/', async (req, res) => {
 })
 
 // POST /api/consultations/:id/upload-audio - Upload de áudio da consulta
-router.post('/:id/upload-audio', async (req, res) => {
+router.post('/:id/upload-audio', upload.single('audio'), async (req, res) => {
+  console.log('[Upload Áudio] 🚀 Requisição recebida')
+
   try {
     const { id } = req.params
 
+    console.log('[Upload Áudio] Verificando consulta...')
     const consultation = await prisma.consultation.findUnique({
       where: { id },
     })
 
     if (!consultation) {
+      console.error('[Upload Áudio] Consulta não encontrada:', id)
       return res.status(404).json({ error: 'Consulta não encontrada' })
     }
 
-    const form = formidable({
-      uploadDir: UPLOADS_DIR,
-      keepExtensions: true,
-      maxFileSize: 100 * 1024 * 1024, // 100MB
-      filter: ({ mimetype, name }) => {
-        // Aceitar arquivos de áudio por mimetype ou extensão
-        // Alguns navegadores mobile podem não enviar mimetype correto
-        const isAudioMimetype = mimetype?.startsWith('audio/') || mimetype?.startsWith('video/webm')
-        const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.webm', '.mpeg', '.mp4', '.aac', '.flac']
-        const hasAudioExtension = name ? audioExtensions.some(ext => name.toLowerCase().endsWith(ext)) : false
+    if (!req.file) {
+      console.error('[Upload Áudio] Nenhum arquivo recebido')
+      return res.status(400).json({ error: 'Arquivo de áudio é obrigatório' })
+    }
 
-        return isAudioMimetype || hasAudioExtension
+    console.log('[Upload Áudio] Arquivo recebido:', {
+      name: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      path: req.file.path,
+    })
+
+    // Ler o arquivo como buffer
+    console.log('[Upload Áudio] Lendo buffer do arquivo...')
+    const fileBuffer = await fs.readFile(req.file.path)
+    console.log(`[Upload Áudio] Buffer lido: ${fileBuffer.length} bytes`)
+
+    // Gerar nome único
+    const uniqueFilename = generateUniqueFilename(req.file.originalname || 'audio.webm')
+    console.log(`[Upload Áudio] Nome único gerado: ${uniqueFilename}`)
+
+    // Upload para Vercel Blob ou sistema de arquivos local
+    console.log('[Upload Áudio] Enviando para storage...')
+    const fileUrl = await uploadFile(fileBuffer, uniqueFilename, 'consultations')
+    console.log(`[Upload Áudio] Arquivo salvo: ${fileUrl}`)
+
+    // Criar registro no banco
+    console.log('[Upload Áudio] Criando registro no banco...')
+    const audioRecord = await prisma.consultationAudio.create({
+      data: {
+        consultationId: id,
+        fileUrl: fileUrl,
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+        transcriptionStatus: 'PROCESSING',
       },
     })
+    console.log(`[Upload Áudio] Registro criado com ID: ${audioRecord.id}`)
 
-    form.parse(req, async (err, _fields, files) => {
-      console.log('[Upload Áudio] Parse iniciado')
+    // Limpar arquivo temporário
+    try {
+      await fs.unlink(req.file.path)
+      console.log('[Upload Áudio] Arquivo temporário removido')
+    } catch (unlinkError) {
+      console.warn('Não foi possível deletar arquivo temporário:', unlinkError)
+    }
 
-      if (err) {
-        console.error('[Upload Áudio] Erro ao processar upload:', err)
-        return res.status(400).json({ error: 'Erro ao processar upload', message: err.message })
-      }
-
-      try {
-        console.log('[Upload Áudio] Parse concluído, processando arquivo...')
-        const audioFile = Array.isArray(files.audio) ? files.audio[0] : files.audio
-
-        if (!audioFile) {
-          console.error('[Upload Áudio] Nenhum arquivo recebido. Files recebidos:', Object.keys(files))
-          return res.status(400).json({ error: 'Arquivo de áudio é obrigatório' })
-        }
-
-        console.log('[Upload Áudio] Arquivo recebido:', {
-          name: audioFile.originalFilename,
-          size: audioFile.size,
-          mimetype: audioFile.mimetype,
-          path: audioFile.filepath,
-        })
-
-        // Ler o arquivo como buffer
-        console.log('[Upload Áudio] Lendo buffer do arquivo...')
-        const fileBuffer = await fs.readFile(audioFile.filepath)
-        console.log(`[Upload Áudio] Buffer lido: ${fileBuffer.length} bytes`)
-
-        // Gerar nome único
-        const uniqueFilename = generateUniqueFilename(audioFile.originalFilename || 'audio.webm')
-        console.log(`[Upload Áudio] Nome único gerado: ${uniqueFilename}`)
-
-        // Upload para Vercel Blob ou sistema de arquivos local
-        console.log('[Upload Áudio] Enviando para storage...')
-        const fileUrl = await uploadFile(fileBuffer, uniqueFilename, 'consultations')
-        console.log(`[Upload Áudio] Arquivo salvo: ${fileUrl}`)
-
-        // Criar registro no banco
-        console.log('[Upload Áudio] Criando registro no banco...')
-        const audioRecord = await prisma.consultationAudio.create({
-          data: {
-            consultationId: id,
-            fileUrl: fileUrl,
-            fileName: audioFile.originalFilename || path.basename(audioFile.filepath),
-            fileSize: typeof audioFile.size === 'number' ? audioFile.size : 0,
-            transcriptionStatus: 'PROCESSING',
-          },
-        })
-        console.log(`[Upload Áudio] Registro criado com ID: ${audioRecord.id}`)
-
-        // Limpar arquivo temporário
-        try {
-          await fs.unlink(audioFile.filepath)
-          console.log('[Upload Áudio] Arquivo temporário removido')
-        } catch (unlinkError) {
-          console.warn('Não foi possível deletar arquivo temporário:', unlinkError)
-        }
-
-        // IMPORTANTE: Enviar resposta IMEDIATAMENTE antes de processar
-        console.log('[Upload Áudio] 📤 Enviando resposta ao cliente...')
-        res.status(200).json({
-          success: true,
-          audio: audioRecord,
-          message: 'Upload realizado com sucesso. Transcrição enviada para a OpenAI.',
-        })
-        console.log('[Upload Áudio] ✅ Resposta enviada!')
-
-        // Iniciar transcrição em background DEPOIS de responder
-        console.log('[Upload Áudio] Iniciando transcrição em background...')
-        processAudioTranscription(audioRecord.id, fileUrl).catch((error) =>
-          console.error('Erro ao processar transcrição:', error)
-        )
-      } catch (error: any) {
-        console.error('[Upload Áudio] ❌ Erro ao salvar áudio:', error)
-        console.error('[Upload Áudio] Stack:', error.stack)
-        res.status(500).json({ error: 'Erro ao salvar áudio', message: error.message })
-      }
+    // IMPORTANTE: Enviar resposta IMEDIATAMENTE antes de processar
+    console.log('[Upload Áudio] 📤 Enviando resposta ao cliente...')
+    res.status(200).json({
+      success: true,
+      audio: audioRecord,
+      message: 'Upload realizado com sucesso. Transcrição enviada para a OpenAI.',
     })
+    console.log('[Upload Áudio] ✅ Resposta enviada!')
+
+    // Iniciar transcrição em background DEPOIS de responder
+    console.log('[Upload Áudio] Iniciando transcrição em background...')
+    processAudioTranscription(audioRecord.id, fileUrl).catch((error) =>
+      console.error('Erro ao processar transcrição:', error)
+    )
   } catch (error: any) {
-    res.status(500).json({ error: 'Erro no upload', message: error.message })
+    console.error('[Upload Áudio] ❌ Erro ao salvar áudio:', error)
+    console.error('[Upload Áudio] Stack:', error.stack)
+    res.status(500).json({ error: 'Erro ao salvar áudio', message: error.message })
   }
 })
 
