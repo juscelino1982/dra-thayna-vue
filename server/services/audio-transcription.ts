@@ -1,12 +1,6 @@
-import OpenAI from 'openai'
 import fs from 'fs/promises'
 import path from 'path'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  timeout: 120000, // 2 minutos de timeout
-  maxRetries: 0, // Desabilitar retry automático do SDK (faremos manualmente)
-})
+import FormData from 'form-data'
 
 export interface TranscriptionResult {
   text: string
@@ -125,20 +119,43 @@ export async function transcribeAudio(
       try {
         console.log(`[Transcrição] Tentativa ${attempt}/${maxRetries} de chamada à API OpenAI Whisper...`)
 
-        // Timeout de 60 segundos para cada tentativa
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Timeout na chamada à API OpenAI (60s)')), 60000)
+        // WORKAROUND: Usar FormData e fetch diretamente ao invés do SDK OpenAI
+        // O SDK pode ter problemas com arquivos mobile em ambiente serverless
+        const formData = new FormData()
+
+        formData.append('file', audioBuffer, {
+          filename: fileName,
+          contentType: mimeType,
+        })
+        formData.append('model', 'whisper-1')
+        formData.append('language', 'pt')
+        formData.append('response_format', 'verbose_json')
+        formData.append('temperature', '0.2')
+
+        console.log(`[Transcrição] FormData criado com ${formData.getLengthSync()} bytes`)
+
+        // Timeout de 120 segundos para cada tentativa
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 120000)
+
+        const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+            ...formData.getHeaders(),
+          },
+          body: formData as any,
+          signal: controller.signal,
         })
 
-        const transcriptionPromise = openai.audio.transcriptions.create({
-          file: file,
-          model: 'whisper-1',
-          language: 'pt', // Português
-          response_format: 'verbose_json', // Retorna mais detalhes
-          temperature: 0.2, // Mais conservador = mais preciso
-        })
+        clearTimeout(timeoutId)
 
-        transcription = await Promise.race([transcriptionPromise, timeoutPromise])
+        if (!response.ok) {
+          const errorText = await response.text()
+          throw new Error(`OpenAI API error (${response.status}): ${errorText}`)
+        }
+
+        transcription = await response.json()
 
         console.log(`[Transcrição] ✅ API OpenAI respondeu com sucesso na tentativa ${attempt}`)
         break // Sucesso, sair do loop
