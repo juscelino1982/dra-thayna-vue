@@ -134,12 +134,14 @@ export async function transcribeAudio(
 
       } catch (error: any) {
         lastError = error
-        console.error(`[Transcrição] ❌ Erro na tentativa ${attempt}:`, {
+        console.error(`[Transcrição] ❌ Erro COMPLETO na tentativa ${attempt}:`, error)
+        console.error(`[Transcrição] ❌ Erro detalhado:`, {
           message: error.message,
           code: error.code,
           type: error.type,
           status: error.status,
           name: error.name,
+          stack: error.stack?.substring(0, 500),
         })
 
         if (attempt < maxRetries) {
