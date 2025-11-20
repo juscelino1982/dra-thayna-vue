@@ -181,7 +181,7 @@ async function uploadAudio(consultationId: string, file: File) {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-        timeout: 180000, // 3 minutos de timeout (para celulares com conexão lenta)
+        timeout: 300000, // 5 minutos de timeout (para celulares com conexão muito lenta)
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
             const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
@@ -198,8 +198,21 @@ async function uploadAudio(consultationId: string, file: File) {
   } catch (error: any) {
     console.error('[Upload Áudio] Erro completo:', error)
     console.error('[Upload Áudio] Erro response:', error.response?.data)
-    const errorMsg = error.response?.data?.error || error.message || 'Erro desconhecido'
-    alert('Erro ao enviar áudio: ' + errorMsg)
+
+    let errorMsg = 'Erro desconhecido'
+
+    // Identificar tipo de erro de conexão
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      errorMsg = 'Timeout: O upload demorou muito. Tente com uma conexão melhor ou com um áudio menor.'
+    } else if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
+      errorMsg = 'Erro de rede: Verifique sua conexão com a internet.'
+    } else if (error.message?.includes('Connection error')) {
+      errorMsg = 'Erro de conexão: A conexão foi interrompida durante o upload.'
+    } else {
+      errorMsg = error.response?.data?.error || error.message || 'Erro desconhecido'
+    }
+
+    alert(`❌ Erro ao enviar áudio:\n\n${errorMsg}\n\nCódigo: ${error.code || 'N/A'}\nStatus: ${error.response?.status || 'N/A'}`)
   } finally {
     uploadingAudio.value = false
   }
