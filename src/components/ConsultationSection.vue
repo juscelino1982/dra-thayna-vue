@@ -180,7 +180,13 @@ async function uploadAudio(consultationId: string, file: File) {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-        timeout: 60000, // 60 segundos de timeout
+        timeout: 180000, // 3 minutos de timeout (para celulares com conexão lenta)
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+            console.log(`[Upload Áudio] Progresso: ${percentCompleted}%`)
+          }
+        }
       }
     )
 
@@ -335,8 +341,36 @@ async function startRecording() {
     recordingDuration.value = 0
     recordingState.value = 'preparing'
 
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    mediaRecorder = new MediaRecorder(mediaStream)
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        sampleRate: 44100
+      }
+    })
+
+    // Tentar diferentes codecs para compatibilidade móvel
+    let options: MediaRecorderOptions = {}
+    const mimeTypes = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/ogg;codecs=opus',
+      'audio/mp4',
+      'audio/mpeg',
+      ''
+    ]
+
+    for (const mimeType of mimeTypes) {
+      if (mimeType === '' || MediaRecorder.isTypeSupported(mimeType)) {
+        if (mimeType !== '') {
+          options = { mimeType }
+        }
+        console.log(`[Gravação] Usando MIME type: ${mimeType || 'padrão do navegador'}`)
+        break
+      }
+    }
+
+    mediaRecorder = new MediaRecorder(mediaStream, options)
 
     mediaRecorder.ondataavailable = event => {
       if (event.data && event.data.size) {
@@ -454,16 +488,28 @@ async function uploadRecordedAudio() {
       ? 'ogg'
       : mimeType.includes('wav')
       ? 'wav'
+      : mimeType.includes('mp4')
+      ? 'mp4'
       : 'webm'
 
     const fileName = `consulta-${currentRecordingConsultation.value.id}-${Date.now()}.${extension}`
     const file = new File([recordedBlob.value], fileName, { type: mimeType })
 
+    console.log('[Upload Áudio Gravado] Detalhes:', {
+      fileName,
+      mimeType,
+      size: recordedBlob.value.size,
+      extension,
+      blobType: recordedBlob.value.type
+    })
+
     await uploadAudio(currentRecordingConsultation.value.id, file)
     closeRecordingDialog()
   } catch (error: any) {
     console.error('Erro ao enviar áudio gravado:', error)
-    recordingError.value = 'Erro ao enviar áudio gravado: ' + (error.message || 'desconhecido')
+    console.error('Stack:', error.stack)
+    const errorDetails = error.response?.data?.message || error.message || 'desconhecido'
+    recordingError.value = `Erro ao enviar áudio: ${errorDetails}`
     recordingState.value = 'review'
   }
 }
