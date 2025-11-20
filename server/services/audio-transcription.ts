@@ -1,6 +1,7 @@
 import fs from 'fs/promises'
 import path from 'path'
 import FormData from 'form-data'
+import { Readable } from 'stream'
 
 export interface TranscriptionResult {
   text: string
@@ -90,10 +91,14 @@ export async function transcribeAudio(
     const mimeType = getAudioMimeType(fileName)
     const formData = new FormData()
 
-    // Adicionar o buffer como stream ao FormData
-    formData.append('file', audioBuffer, {
+    // Converter buffer para stream legível
+    const audioStream = Readable.from(audioBuffer)
+
+    // Adicionar o stream ao FormData com metadados corretos
+    formData.append('file', audioStream, {
       filename: fileName,
       contentType: mimeType,
+      knownLength: audioBuffer.length,
     })
     formData.append('model', 'whisper-1')
     formData.append('language', 'pt')
