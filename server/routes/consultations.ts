@@ -479,9 +479,11 @@ async function processAudioTranscription(audioId: string, audioFilePath: string)
   try {
     console.log(`[audio:${audioId}] Iniciando transcrição...`)
 
+    // 1. Transcrever áudio com Whisper
     const result = await transcribeAudio(audioFilePath)
 
-    await prisma.consultationAudio.update({
+    // 2. Atualizar o áudio com a transcrição
+    const updatedAudio = await prisma.consultationAudio.update({
       where: { id: audioId },
       data: {
         transcription: result.text,
@@ -489,9 +491,44 @@ async function processAudioTranscription(audioId: string, audioFilePath: string)
         transcriptionStatus: 'COMPLETED',
         transcriptionError: null,
       },
+      include: {
+        consultation: true
+      }
     })
 
-    console.log(`[audio:${audioId}] Transcrição concluída com sucesso!`)
+    console.log(`[audio:${audioId}] Transcrição concluída: ${result.text.length} caracteres`)
+
+    // 3. Extrair informações estruturadas com Claude (se transcrição tiver conteúdo significativo)
+    if (result.text.length > 50) {
+      try {
+        console.log(`[audio:${audioId}] Extraindo informações estruturadas...`)
+
+        const { extractConsultationData } = await import('../services/audio-transcription.js')
+        const extracted = await extractConsultationData(result.text)
+
+        // 4. Atualizar a consulta com as informações extraídas
+        await prisma.consultation.update({
+          where: { id: updatedAudio.consultationId },
+          data: {
+            chiefComplaint: extracted.chiefComplaint || updatedAudio.consultation.chiefComplaint,
+            symptoms: extracted.symptoms.length > 0
+              ? extracted.symptoms.join('; ')
+              : updatedAudio.consultation.symptoms,
+            medicalHistory: extracted.medicalHistory.length > 0
+              ? extracted.medicalHistory.join('; ')
+              : updatedAudio.consultation.medicalHistory,
+            transcription: `${extracted.summary}\n\n---\n\nTRANSCRIÇÃO COMPLETA:\n${result.text}`,
+          },
+        })
+
+        console.log(`[audio:${audioId}] Informações estruturadas extraídas e salvas na consulta`)
+      } catch (extractError: any) {
+        console.error(`[audio:${audioId}] Erro ao extrair informações:`, extractError.message)
+        // Não falha a transcrição se a extração falhar - continua apenas com a transcrição
+      }
+    }
+
+    console.log(`[audio:${audioId}] Processamento completo!`)
   } catch (error: any) {
     console.error(`[audio:${audioId}] Erro na transcrição:`, error)
 

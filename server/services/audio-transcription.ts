@@ -154,15 +154,83 @@ export async function extractConsultationData(transcription: string): Promise<{
   recommendations: string[]
   summary: string
 }> {
-  // Aqui podemos usar Claude para estruturar melhor a transcrição
-  // Por enquanto, retornamos a transcrição como está
-  // TODO: Implementar extração estruturada com Claude AI
+  try {
+    console.log('[Extração] Analisando transcrição com Claude...')
 
-  return {
-    chiefComplaint: transcription.split('\n')[0] || '',
-    symptoms: [],
-    medicalHistory: [],
-    recommendations: [],
-    summary: transcription,
+    const Anthropic = (await import('@anthropic-ai/sdk')).default
+    const anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    })
+
+    const prompt = `Você é um assistente médico especializado em análise de consultas. Analise a seguinte transcrição de uma consulta médica e extraia as informações estruturadas em JSON.
+
+TRANSCRIÇÃO DA CONSULTA:
+${transcription}
+
+Extraia e retorne um JSON com a seguinte estrutura:
+{
+  "chiefComplaint": "Queixa principal do paciente (1-2 frases)",
+  "symptoms": ["Lista de sintomas mencionados"],
+  "medicalHistory": ["Histórico médico relevante mencionado"],
+  "recommendations": ["Recomendações e orientações dadas"],
+  "summary": "Resumo estruturado da consulta em 2-3 parágrafos, incluindo: queixa principal, sintomas relatados, achados do exame físico (se mencionado), hipóteses diagnósticas, e plano de tratamento/acompanhamento"
+}
+
+IMPORTANTE:
+- Seja conciso mas preserve informações médicas importantes
+- Use termos médicos quando apropriado
+- Se uma seção não tiver informação, use array vazio [] ou string vazia ""
+- O resumo deve ser claro e útil para a Dra. Thayná revisar rapidamente a consulta
+
+Retorne APENAS o JSON, sem explicações adicionais.`
+
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5-20250929',
+      max_tokens: 2000,
+      temperature: 0.3,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    })
+
+    const content = response.content[0]
+    if (content.type !== 'text') {
+      throw new Error('Resposta inesperada do Claude')
+    }
+
+    // Extrair JSON da resposta (remover markdown se houver)
+    let jsonText = content.text.trim()
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '')
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/```\n?/g, '')
+    }
+
+    const extracted = JSON.parse(jsonText)
+
+    console.log('[Extração] Dados estruturados extraídos com sucesso')
+
+    return {
+      chiefComplaint: extracted.chiefComplaint || '',
+      symptoms: Array.isArray(extracted.symptoms) ? extracted.symptoms : [],
+      medicalHistory: Array.isArray(extracted.medicalHistory) ? extracted.medicalHistory : [],
+      recommendations: Array.isArray(extracted.recommendations) ? extracted.recommendations : [],
+      summary: extracted.summary || transcription,
+    }
+  } catch (error: any) {
+    console.error('[Extração] Erro ao processar com Claude:', error.message)
+    console.warn('[Extração] Retornando estrutura básica como fallback')
+
+    // Fallback: retornar estrutura básica
+    return {
+      chiefComplaint: transcription.split('\n')[0] || '',
+      symptoms: [],
+      medicalHistory: [],
+      recommendations: [],
+      summary: transcription,
+    }
   }
 }
