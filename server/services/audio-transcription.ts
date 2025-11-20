@@ -28,20 +28,57 @@ export async function transcribeAudio(
   try {
     console.log(`[Transcrição] Iniciando transcrição do arquivo: ${audioFilePathOrUrl}`)
 
-    let audioBuffer: Buffer
-    let fileName: string
+    let audioBuffer: Buffer | null = null
+    let fileName: string = ''
 
     // Verificar se é URL do Vercel Blob ou path local
     if (audioFilePathOrUrl.startsWith('http://') || audioFilePathOrUrl.startsWith('https://')) {
       console.log('[Transcrição] Baixando áudio do Vercel Blob...')
-      // URL do Vercel Blob - baixar
-      const response = await fetch(audioFilePathOrUrl)
-      if (!response.ok) {
-        throw new Error(`Erro ao baixar áudio: ${response.statusText}`)
+
+      // Retry com timeout para download do Vercel Blob
+      let lastError: Error | null = null
+      const maxRetries = 3
+
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`[Transcrição] Tentativa ${attempt}/${maxRetries} de download...`)
+
+          // Fetch com timeout de 30 segundos
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 30000)
+
+          const response = await fetch(audioFilePathOrUrl, {
+            signal: controller.signal
+          })
+
+          clearTimeout(timeoutId)
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+          }
+
+          const arrayBuffer = await response.arrayBuffer()
+          audioBuffer = Buffer.from(arrayBuffer)
+          fileName = audioFilePathOrUrl.split('/').pop() || 'audio.webm'
+
+          console.log(`[Transcrição] Download concluído: ${audioBuffer.length} bytes`)
+          break // Sucesso, sair do loop
+
+        } catch (error: any) {
+          lastError = error
+          console.error(`[Transcrição] Erro na tentativa ${attempt}:`, error.message)
+
+          if (attempt < maxRetries) {
+            const delay = attempt * 1000 // 1s, 2s, 3s
+            console.log(`[Transcrição] Aguardando ${delay}ms antes de tentar novamente...`)
+            await new Promise(resolve => setTimeout(resolve, delay))
+          }
+        }
       }
-      const arrayBuffer = await response.arrayBuffer()
-      audioBuffer = Buffer.from(arrayBuffer)
-      fileName = audioFilePathOrUrl.split('/').pop() || 'audio.webm'
+
+      if (!audioBuffer) {
+        throw new Error(`Falha ao baixar áudio após ${maxRetries} tentativas: ${lastError?.message}`)
+      }
     } else {
       console.log('[Transcrição] Lendo áudio local...')
       // Path local - ler
