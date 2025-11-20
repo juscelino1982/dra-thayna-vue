@@ -1,7 +1,7 @@
 import OpenAI from 'openai'
 import fs from 'fs/promises'
 import path from 'path'
-import { File } from 'node-fetch'
+import { Blob } from 'node-fetch'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -100,15 +100,19 @@ export async function transcribeAudio(
       bufferSizeKB: (audioBuffer.length / 1024).toFixed(2),
     })
 
-    // Criar File object simples - código que funcionava antes
-    const file = new File([new Uint8Array(audioBuffer)], fileName, {
-      type: mimeType,
+    // Criar Blob e adicionar propriedades de File manualmente
+    const blob = new Blob([new Uint8Array(audioBuffer)], { type: mimeType })
+
+    // Adicionar propriedades name e lastModified que a API espera
+    const file = Object.assign(blob, {
+      name: fileName,
+      lastModified: Date.now(),
     })
 
-    console.log(`[Transcrição] File criado:`, {
+    console.log(`[Transcrição] File criado a partir de Blob:`, {
       name: file.name,
-      size: file.size,
-      type: file.type,
+      size: blob.size,
+      type: blob.type,
     })
 
     // Chamar Whisper API (mantendo retry por segurança)
