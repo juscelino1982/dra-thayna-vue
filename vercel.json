@@ -8,5 +8,10 @@
       "source": "/api/:path*",
       "destination": "/api"
     }
-  ]
+  ],
+  "functions": {
+    "api/**/*.ts": {
+      "maxDuration": 60
+    }
+  }
 }
