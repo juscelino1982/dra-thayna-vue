@@ -190,7 +190,6 @@ router.post('/:id/reprocess', async (req, res) => {
         keyFindings: null,
         abnormalValues: null,
         extractedData: null,
-        recommendations: null,
       },
     })
 
@@ -215,9 +214,22 @@ router.post('/:id/reprocess', async (req, res) => {
 async function processExamAnalysis(examId: string, filePath: string, fileType: 'pdf' | 'image') {
   try {
     console.log(`[${examId}] Iniciando análise do exame...`)
+    const startTime = Date.now()
 
-    // Analisar com IA
-    const analysis = await analyzeExam(filePath, fileType)
+    // Criar timeout de 2 minutos (120s)
+    const timeoutMs = 120000
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(`Timeout: análise excedeu ${timeoutMs/1000}s`)), timeoutMs)
+    })
+
+    // Analisar com IA (com timeout)
+    const analysis = await Promise.race([
+      analyzeExam(filePath, fileType),
+      timeoutPromise
+    ])
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(`[${examId}] Análise completada em ${duration}s`)
 
     // Atualizar exame com resultados
     await prisma.exam.update({
@@ -236,16 +248,17 @@ async function processExamAnalysis(examId: string, filePath: string, fileType: '
       },
     })
 
-    console.log(`[${examId}] Análise concluída com sucesso!`)
+    console.log(`[${examId}] ✅ Análise concluída com sucesso!`)
   } catch (error: any) {
-    console.error(`[${examId}] Erro na análise:`, error)
+    console.error(`[${examId}] ❌ Erro na análise:`, error.message)
+    console.error(`[${examId}] Stack:`, error.stack)
 
     // Atualizar com erro
     await prisma.exam.update({
       where: { id: examId },
       data: {
         processingStatus: 'FAILED',
-        processingError: error.message,
+        processingError: error.message || 'Erro desconhecido na análise',
       },
     })
   }

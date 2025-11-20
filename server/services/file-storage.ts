@@ -28,18 +28,47 @@ export async function uploadFile(
 ): Promise<string> {
   // Produção (Vercel): Usar Vercel Blob Storage
   if (isProduction && isVercel) {
-    try {
-      const blob = await put(`${folder}/${filename}`, file, {
-        access: 'public',
-        token: process.env.BLOB_READ_WRITE_TOKEN,
-      });
+    let lastError: Error | null = null;
+    const maxRetries = 3;
 
-      console.log('✅ Arquivo enviado para Vercel Blob:', blob.url);
-      return blob.url;
-    } catch (error) {
-      console.error('❌ Erro ao enviar para Vercel Blob:', error);
-      throw new Error('Falha ao fazer upload do arquivo');
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`📤 Upload tentativa ${attempt}/${maxRetries} para Vercel Blob...`);
+
+        const blob = await put(`${folder}/${filename}`, file, {
+          access: 'public',
+          token: process.env.BLOB_READ_WRITE_TOKEN,
+        });
+
+        console.log('✅ Arquivo enviado para Vercel Blob:', blob.url);
+
+        // Verificar se o arquivo realmente existe fazendo um HEAD request
+        try {
+          const verifyResponse = await fetch(blob.url, { method: 'HEAD' });
+          if (!verifyResponse.ok) {
+            throw new Error(`Verificação falhou: ${verifyResponse.status} ${verifyResponse.statusText}`);
+          }
+          console.log('✅ Upload verificado com sucesso!');
+        } catch (verifyError: any) {
+          console.warn(`⚠️  Falha na verificação do upload:`, verifyError.message);
+          throw new Error(`Upload aparentemente bem-sucedido mas arquivo não está acessível: ${verifyError.message}`);
+        }
+
+        return blob.url;
+      } catch (error: any) {
+        lastError = error;
+        console.error(`❌ Erro na tentativa ${attempt}/${maxRetries}:`, error.message);
+
+        if (attempt < maxRetries) {
+          const delayMs = attempt * 1000; // 1s, 2s, 3s
+          console.log(`⏳ Aguardando ${delayMs}ms antes de tentar novamente...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      }
     }
+
+    console.error('❌ Todas as tentativas de upload falharam');
+    throw new Error(`Falha ao fazer upload do arquivo após ${maxRetries} tentativas: ${lastError?.message}`);
   }
 
   // Desenvolvimento: Armazenamento local
