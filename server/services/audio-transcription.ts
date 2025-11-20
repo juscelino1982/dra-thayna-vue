@@ -1,10 +1,6 @@
-import OpenAI, { toFile } from 'openai'
 import fs from 'fs/promises'
 import path from 'path'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+import FormData from 'form-data'
 
 export interface TranscriptionResult {
   text: string
@@ -90,19 +86,39 @@ export async function transcribeAudio(
       fileName = path.basename(audioFilePathOrUrl)
     }
 
-    // Criar File object para OpenAI usando toFile() oficial
+    // Usar FormData e fetch direto - contornando problemas do SDK em serverless
     const mimeType = getAudioMimeType(fileName)
-    const file = await toFile(audioBuffer, fileName, { type: mimeType })
+    const formData = new FormData()
 
-    // Chamar Whisper API
-    const startTime = Date.now()
-    const transcription = await openai.audio.transcriptions.create({
-      file: file,
-      model: 'whisper-1',
-      language: 'pt',
-      response_format: 'verbose_json',
-      temperature: 0.2,
+    // Adicionar o buffer como stream ao FormData
+    formData.append('file', audioBuffer, {
+      filename: fileName,
+      contentType: mimeType,
     })
+    formData.append('model', 'whisper-1')
+    formData.append('language', 'pt')
+    formData.append('response_format', 'verbose_json')
+    formData.append('temperature', '0.2')
+
+    console.log(`[Transcrição] Enviando para OpenAI: ${fileName}, ${mimeType}, ${audioBuffer.length} bytes`)
+
+    // Chamar API REST diretamente
+    const startTime = Date.now()
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        ...formData.getHeaders(),
+      },
+      body: formData as any,
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`OpenAI API error ${response.status}: ${errorText}`)
+    }
+
+    const transcription = await response.json()
 
     const duration = Date.now() - startTime
 
