@@ -171,6 +171,9 @@
               label="Paciente"
               variant="outlined"
               :rules="[v => !!v || 'Paciente obrigatório']"
+              :loading="patients.length === 0"
+              :no-data-text="patients.length === 0 ? 'Carregando pacientes...' : 'Nenhum paciente encontrado'"
+              clearable
               class="mb-4"
             />
 
@@ -183,10 +186,12 @@
               class="mb-4"
             />
 
-            <v-text-field
+            <v-select
               v-model="uploadData.magnification"
-              label="Ampliação (ex: 40x, 100x)"
+              :items="magnificationOptions"
+              label="Ampliação"
               variant="outlined"
+              clearable
             />
           </v-form>
         </v-card-text>
@@ -273,6 +278,15 @@ const analysisTypes = [
   { title: 'Campo Claro', value: 'campo_claro' },
   { title: 'Campo Escuro', value: 'campo_escuro' },
   { title: 'Contraste de Fase', value: 'contraste_fase' },
+]
+
+const magnificationOptions = [
+  { title: '4x (Objetiva de Varredura)', value: '4x' },
+  { title: '10x (Objetiva de Baixo Aumento)', value: '10x' },
+  { title: '40x (Objetiva de Alto Aumento Seco)', value: '40x' },
+  { title: '100x (Objetiva de Imersão em Óleo)', value: '100x' },
+  { title: '400x (Aumento Total)', value: '400x' },
+  { title: '1000x (Aumento Total)', value: '1000x' },
 ]
 
 const filteredImages = computed(() => {
