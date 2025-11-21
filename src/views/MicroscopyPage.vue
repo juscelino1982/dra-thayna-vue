@@ -43,10 +43,7 @@
     <v-card class="mb-6" elevation="2" color="primary" variant="tonal">
       <v-card-text>
         <v-row align="center">
-          <v-col cols="12" md="1" class="d-flex justify-center">
-            <v-icon size="48" color="primary">mdi-microscope</v-icon>
-          </v-col>
-          <v-col cols="12" md="5">
+          <v-col cols="12" md="6">
             <v-autocomplete
               v-model="selectedPatientId"
               :items="patients"
