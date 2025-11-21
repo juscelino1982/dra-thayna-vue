@@ -163,7 +163,7 @@
               class="mb-4"
             />
 
-            <v-autocomplete
+            <v-select
               v-model="uploadData.patientId"
               :items="patients"
               item-title="fullName"
@@ -176,20 +176,15 @@
               clearable
               class="mb-4"
             >
-              <template v-slot:append-inner>
-                <v-tooltip text="Recarregar pacientes">
-                  <template v-slot:activator="{ props }">
-                    <v-btn
-                      v-bind="props"
-                      icon="mdi-refresh"
-                      size="x-small"
-                      variant="text"
-                      @click="loadPatients"
-                    />
-                  </template>
-                </v-tooltip>
+              <template v-slot:prepend>
+                <v-btn
+                  icon="mdi-refresh"
+                  size="x-small"
+                  variant="text"
+                  @click.stop="loadPatients"
+                />
               </template>
-            </v-autocomplete>
+            </v-select>
 
             <v-select
               v-model="uploadData.analysisType"
