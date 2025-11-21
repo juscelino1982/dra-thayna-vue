@@ -1,8 +1,8 @@
 import { Router } from 'express'
 import { prisma } from '../lib/prisma.js'
-import { put } from '@vercel/blob'
 import multer from 'multer'
 import sharp from 'sharp'
+import { uploadFile, generateUniqueFilename } from '../services/file-storage.js'
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage() })
@@ -44,30 +44,27 @@ router.post('/upload', upload.single('image'), async (req, res) => {
     const { patientId, examId, analysisType, magnification, title, description } = req.body
     const uploadedBy = req.headers['x-user-id'] as string || 'system'
 
+    // Gerar nome único para o arquivo
+    const uniqueFilename = generateUniqueFilename(req.file.originalname)
+
     // Gerar thumbnail
     const thumbnailBuffer = await sharp(req.file.buffer)
       .resize(300, 300, { fit: 'inside' })
       .jpeg({ quality: 80 })
       .toBuffer()
 
-    // Upload da imagem original para Vercel Blob
-    const imageBlob = await put(
-      `microscopy/${patientId}/${Date.now()}-${req.file.originalname}`,
+    // Upload da imagem original
+    const imageUrl = await uploadFile(
       req.file.buffer,
-      {
-        access: 'public',
-        contentType: req.file.mimetype,
-      }
+      uniqueFilename,
+      `microscopy/${patientId}`
     )
 
     // Upload do thumbnail
-    const thumbnailBlob = await put(
-      `microscopy/thumbnails/${patientId}/${Date.now()}-thumb.jpg`,
+    const thumbnailUrl = await uploadFile(
       thumbnailBuffer,
-      {
-        access: 'public',
-        contentType: 'image/jpeg',
-      }
+      `thumb-${uniqueFilename}`,
+      `microscopy/thumbnails/${patientId}`
     )
 
     // Obter dimensões da imagem
@@ -79,12 +76,12 @@ router.post('/upload', upload.single('image'), async (req, res) => {
         patientId,
         examId: examId || null,
         fileName: req.file.originalname,
-        fileUrl: imageBlob.url,
+        fileUrl: imageUrl,
         fileSize: req.file.size,
         mimeType: req.file.mimetype,
         width: metadata.width,
         height: metadata.height,
-        thumbnailUrl: thumbnailBlob.url,
+        thumbnailUrl: thumbnailUrl,
         analysisType: analysisType || 'campo_claro',
         magnification,
         title,

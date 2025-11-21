@@ -140,7 +140,7 @@
               variant="elevated"
               size="large"
               block
-              @click="() => { alert('CLICOU! ' + image.id); selectedImage = image; viewerDialog = true; }"
+              @click="visualizarMicroscopia(image)"
             >
               Visualizar Microscopia
             </v-btn>
@@ -268,7 +268,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import axios from 'axios'
-import MicroscopyViewer from '@/components/MicroscopyViewer.vue'
+import MicroscopyViewer from '../components/MicroscopyViewer.vue'
 
 interface MicroscopyImage {
   id: string
@@ -438,8 +438,6 @@ function resetUploadForm() {
 }
 
 function visualizarMicroscopia(image: MicroscopyImage) {
-  alert('🔴 TESTE: Botão clicado! ID da imagem: ' + image.id)
-
   selectedImage.value = image
   viewerDialog.value = true
 }

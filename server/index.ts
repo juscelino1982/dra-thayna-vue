@@ -2,12 +2,14 @@ import express from 'express'
 import cors from 'cors'
 import swaggerUi from 'swagger-ui-express'
 import { swaggerSpec, swaggerUiOptions } from './config/swagger'
+import authRouter from './routes/auth'
 import patientsRouter from './routes/patients'
 import examsRouter from './routes/exams'
 import consultationsRouter from './routes/consultations'
 import reportsRouter from './routes/reports'
 import dashboardRouter from './routes/dashboard'
 import appointmentsRouter from './routes/appointments'
+import microscopyRouter from './routes/microscopy'
 // import calendarRouter from './routes/calendar' // Temporariamente desabilitado
 import { ensureDefaultUser } from './utils/ensure-default-user'
 
@@ -18,6 +20,9 @@ const PORT = 3001
 app.use(cors())
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
+
+// Servir arquivos estáticos da pasta uploads
+app.use('/uploads', express.static('uploads'))
 
 // Swagger Documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerUiOptions))
@@ -65,12 +70,14 @@ app.get('/health', (req, res) => {
 })
 
 // Routes
+app.use('/api/auth', authRouter)
 app.use('/api/dashboard', dashboardRouter)
 app.use('/api/patients', patientsRouter)
 app.use('/api/exams', examsRouter)
 app.use('/api/consultations', consultationsRouter)
 app.use('/api/reports', reportsRouter)
 app.use('/api/appointments', appointmentsRouter)
+app.use('/api/microscopy', microscopyRouter)
 // app.use('/api/calendar', calendarRouter) // Temporariamente desabilitado
 
 // 404 Handler
