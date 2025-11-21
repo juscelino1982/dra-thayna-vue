@@ -22,7 +22,7 @@
               </h2>
 
               <p class="text-body-1 text-grey-lighten-3 mb-8">
-                Plataforma completa para gestão clínica inteligente com acompanhamento personalizado de pacientes.
+                Plataforma completa para medicina integrativa com análise de exames, gestão de pacientes e acompanhamento personalizado.
               </p>
 
               <v-row class="mt-8">
@@ -132,19 +132,19 @@ const formRef = ref()
 
 const features = [
   {
-    icon: 'mdi-account-heart',
-    title: 'Gestão de Pacientes',
-    description: 'Cadastro e histórico completo',
+    icon: 'mdi-test-tube',
+    title: 'Análise de Exames',
+    description: 'Interpretação e laudos',
   },
   {
-    icon: 'mdi-calendar-check',
-    title: 'Agendamentos',
-    description: 'Controle de consultas',
+    icon: 'mdi-account-heart',
+    title: 'Gestão Completa',
+    description: 'Pacientes e consultas',
   },
   {
     icon: 'mdi-chart-line',
     title: 'Acompanhamento',
-    description: 'Relatórios e evolução',
+    description: 'Evolução detalhada',
   },
 ]
 
