@@ -163,7 +163,7 @@
               class="mb-4"
             />
 
-            <v-select
+            <v-autocomplete
               v-model="uploadData.patientId"
               :items="patients"
               item-title="fullName"
@@ -174,17 +174,9 @@
               :loading="patientsLoading"
               :no-data-text="patientsLoading ? 'Carregando pacientes...' : 'Nenhum paciente encontrado'"
               clearable
+              auto-select-first
               class="mb-4"
-            >
-              <template v-slot:prepend>
-                <v-btn
-                  icon="mdi-refresh"
-                  size="x-small"
-                  variant="text"
-                  @click.stop="loadPatients"
-                />
-              </template>
-            </v-select>
+            />
 
             <v-select
               v-model="uploadData.analysisType"
