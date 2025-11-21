@@ -76,6 +76,7 @@ model Patient {
   reports       Report[]
   exams         Exam[]
   appointments  Appointment[]
+  microscopyImages MicroscopyImage[]
 
   @@map("patients")
 }
@@ -377,8 +378,84 @@ model Exam {
 
   // Relacionamentos
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  microscopyImages MicroscopyImage[]
 
   @@map("exams")
+}
+
+// ====================================
+// MICROSCOPIA E ANOTAÇÕES
+// ====================================
+
+model MicroscopyImage {
+  id          String   @id @default(cuid())
+  examId      String?
+  patientId   String
+  consultationId String?
+
+  // Informações da Imagem
+  fileName    String
+  fileUrl     String
+  fileSize    Int     // bytes
+  mimeType    String  // "image/jpeg", "image/png", etc
+  width       Int?
+  height      Int?
+
+  // Tipo de Análise
+  analysisType String  // "campo_claro", "campo_escuro", "contraste_fase"
+  magnification String? // Ex: "40x", "100x"
+
+  // Thumbnail para listagem
+  thumbnailUrl String?
+
+  // Anotações e Observações
+  title       String?
+  description String?
+  observations String? // Observações gerais da imagem
+
+  // Metadata
+  uploadedBy  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relacionamentos
+  exam         Exam?         @relation(fields: [examId], references: [id], onDelete: SetNull)
+  patient      Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  annotations  ImageAnnotation[]
+
+  @@map("microscopy_images")
+}
+
+model ImageAnnotation {
+  id       String   @id @default(cuid())
+  imageId  String
+
+  // Tipo de Anotação
+  type     String   // "circle", "arrow", "rectangle", "text", "freehand"
+
+  // Dados da Anotação (JSON)
+  // Para circle: { x, y, radius, color }
+  // Para arrow: { x1, y1, x2, y2, color }
+  // Para text: { x, y, text, fontSize, color }
+  data     Json
+
+  // Conteúdo Textual
+  label    String?  // Ex: "Hemácia irregular", "Cristal de colesterol"
+  notes    String?  // Observações detalhadas sobre esta anotação
+
+  // Cor e Estilo
+  color    String   @default("#FF5722") // Cor da anotação
+  opacity  Float    @default(0.7)
+
+  // Metadata
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  image MicroscopyImage @relation(fields: [imageId], references: [id], onDelete: Cascade)
+
+  @@map("image_annotations")
 }
 
 // ====================================
