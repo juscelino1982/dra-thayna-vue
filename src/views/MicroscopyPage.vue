@@ -140,7 +140,7 @@
               variant="elevated"
               size="large"
               block
-              @click="visualizarMicroscopia(image)"
+              @click="() => { alert('CLICOU! ' + image.id); selectedImage = image; viewerDialog = true; }"
             >
               Visualizar Microscopia
             </v-btn>
