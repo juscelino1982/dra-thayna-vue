@@ -13,46 +13,47 @@
       </v-col>
     </v-row>
 
-    <!-- Seleção de Paciente e Upload -->
+    <!-- Área de Upload -->
+    <v-card class="mb-6" elevation="2">
+      <v-card-text>
+        <v-row align="center">
+          <v-col cols="12" md="5">
+            <v-autocomplete
+              v-model="selectedPatientId"
+              :items="patients"
+              item-title="fullName"
+              item-value="id"
+              label="Selecionar Paciente"
+              variant="outlined"
+              prepend-inner-icon="mdi-account"
+              :loading="patientsLoading"
+              :no-data-text="patientsLoading ? 'Carregando pacientes...' : 'Nenhum paciente encontrado'"
+              clearable
+              hide-details
+            />
+          </v-col>
+          <v-col cols="12" md="7" class="d-flex justify-end gap-2">
+            <v-btn
+              color="primary"
+              size="large"
+              prepend-icon="mdi-upload"
+              :disabled="!selectedPatientId"
+              @click="uploadDialog = true"
+            >
+              Upload de Imagem
+            </v-btn>
+          </v-col>
+        </v-row>
+      </v-card-text>
+    </v-card>
+
+    <!-- Filtros de Visualização -->
     <v-row class="mb-4">
       <v-col cols="12" md="6">
-        <v-autocomplete
-          v-model="selectedPatientId"
-          :items="patients"
-          item-title="fullName"
-          item-value="id"
-          label="Selecionar Paciente para Upload"
-          variant="outlined"
-          prepend-inner-icon="mdi-account"
-          :loading="patientsLoading"
-          :no-data-text="patientsLoading ? 'Carregando pacientes...' : 'Nenhum paciente encontrado'"
-          clearable
-          auto-select-first
-          hint="Selecione o paciente antes de fazer upload"
-          persistent-hint
-        />
-      </v-col>
-      <v-col cols="12" md="6" class="d-flex align-end">
-        <v-btn
-          color="primary"
-          size="large"
-          prepend-icon="mdi-upload"
-          :disabled="!selectedPatientId"
-          @click="uploadDialog = true"
-          block
-        >
-          Upload de Imagem
-        </v-btn>
-      </v-col>
-    </v-row>
-
-    <!-- Filtros -->
-    <v-row>
-      <v-col cols="12" md="4">
         <v-text-field
           v-model="search"
           prepend-inner-icon="mdi-magnify"
-          label="Buscar paciente"
+          label="Buscar por título ou paciente"
           variant="outlined"
           density="compact"
           hide-details
@@ -82,9 +83,9 @@
       <v-col v-else-if="filteredImages.length === 0" cols="12" class="text-center pa-12">
         <v-icon size="64" color="grey-lighten-1">mdi-microscope</v-icon>
         <p class="text-h6 mt-4 text-grey-darken-1">Nenhuma imagem encontrada</p>
-        <v-btn color="primary" class="mt-4" @click="uploadDialog = true">
-          Fazer Upload
-        </v-btn>
+        <p class="text-body-2 text-grey-darken-1 mt-2">
+          Selecione um paciente acima e clique em "Upload de Imagem" para começar
+        </p>
       </v-col>
 
       <v-col
@@ -430,8 +431,10 @@ function resetUploadForm() {
 }
 
 function openViewer(image: MicroscopyImage) {
+  console.log('🖼️ Abrindo visualizador para imagem:', image)
   selectedImage.value = image
   viewerDialog.value = true
+  console.log('✅ Dialog aberto:', viewerDialog.value)
 }
 
 function editImage(image: MicroscopyImage) {
