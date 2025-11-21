@@ -389,8 +389,6 @@ async function startRecording() {
       }
     })
 
-    alert('✅ Microfone autorizado! Configurando gravação...')
-
     // Tentar diferentes codecs para compatibilidade móvel
     let options: MediaRecorderOptions = {}
     const mimeTypes = [
@@ -413,8 +411,6 @@ async function startRecording() {
         break
       }
     }
-
-    alert(`🎵 Codec selecionado: ${selectedMimeType || 'padrão do navegador'}\n\nIniciando gravação...`)
 
     mediaRecorder = new MediaRecorder(mediaStream, options)
 
