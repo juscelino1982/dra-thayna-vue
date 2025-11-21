@@ -1,6 +1,8 @@
 import OpenAI from 'openai'
 import fs from 'fs/promises'
 import path from 'path'
+// @ts-ignore - undici exports File in runtime
+import { File } from 'undici'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
