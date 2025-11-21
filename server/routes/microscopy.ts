@@ -105,6 +105,44 @@ router.post('/upload', upload.single('image'), async (req, res) => {
 
 /**
  * @swagger
+ * /api/microscopy/all:
+ *   get:
+ *     summary: Listar todas as imagens
+ *     tags: [Microscopy]
+ *     responses:
+ *       200:
+ *         description: Lista de todas as imagens
+ */
+router.get('/all', async (req, res) => {
+  try {
+    const images = await prisma.microscopyImage.findMany({
+      include: {
+        annotations: true,
+        patient: {
+          select: {
+            id: true,
+            fullName: true,
+          },
+        },
+        exam: {
+          select: {
+            id: true,
+            fileName: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    res.json(images)
+  } catch (error: any) {
+    console.error('Erro ao buscar todas as imagens:', error)
+    res.status(500).json({ error: 'Erro ao buscar imagens', message: error.message })
+  }
+})
+
+/**
+ * @swagger
  * /api/microscopy/patient/{patientId}:
  *   get:
  *     summary: Listar imagens de um paciente

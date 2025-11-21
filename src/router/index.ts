@@ -38,6 +38,12 @@ const router = createRouter({
       component: () => import('@/views/CalendarioPage.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/microscopia',
+      name: 'microscopy',
+      component: () => import('@/views/MicroscopyPage.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 

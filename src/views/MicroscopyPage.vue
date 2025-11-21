@@ -1,0 +1,411 @@
+<template>
+  <v-container fluid class="pa-6">
+    <v-row>
+      <v-col cols="12">
+        <div class="d-flex align-center justify-space-between mb-6">
+          <div>
+            <h1 class="text-h4 font-weight-bold mb-2">Microscopia</h1>
+            <p class="text-grey-darken-1">
+              Visualize e anote imagens microscópicas de análise de sangue vivo
+            </p>
+          </div>
+          <v-btn color="primary" size="large" prepend-icon="mdi-upload" @click="uploadDialog = true">
+            Upload de Imagem
+          </v-btn>
+        </div>
+      </v-col>
+    </v-row>
+
+    <!-- Filtros -->
+    <v-row>
+      <v-col cols="12" md="4">
+        <v-text-field
+          v-model="search"
+          prepend-inner-icon="mdi-magnify"
+          label="Buscar paciente"
+          variant="outlined"
+          density="compact"
+          hide-details
+          clearable
+        />
+      </v-col>
+      <v-col cols="12" md="3">
+        <v-select
+          v-model="filterType"
+          :items="analysisTypes"
+          label="Tipo de Análise"
+          variant="outlined"
+          density="compact"
+          hide-details
+          clearable
+        />
+      </v-col>
+    </v-row>
+
+    <!-- Lista de Imagens -->
+    <v-row class="mt-4">
+      <v-col v-if="loading" cols="12" class="text-center pa-12">
+        <v-progress-circular indeterminate color="primary" size="64" />
+        <p class="mt-4 text-grey-darken-1">Carregando imagens...</p>
+      </v-col>
+
+      <v-col v-else-if="filteredImages.length === 0" cols="12" class="text-center pa-12">
+        <v-icon size="64" color="grey-lighten-1">mdi-microscope</v-icon>
+        <p class="text-h6 mt-4 text-grey-darken-1">Nenhuma imagem encontrada</p>
+        <v-btn color="primary" class="mt-4" @click="uploadDialog = true">
+          Fazer Upload
+        </v-btn>
+      </v-col>
+
+      <v-col
+        v-else
+        v-for="image in filteredImages"
+        :key="image.id"
+        cols="12"
+        sm="6"
+        md="4"
+        lg="3"
+      >
+        <v-card elevation="2" hover @click="openViewer(image)">
+          <v-img
+            :src="image.thumbnailUrl || image.fileUrl"
+            height="200"
+            cover
+            class="bg-grey-lighten-2"
+          >
+            <template v-slot:placeholder>
+              <v-progress-circular indeterminate color="primary" />
+            </template>
+          </v-img>
+
+          <v-card-title class="text-subtitle-1">
+            {{ image.title || 'Sem título' }}
+          </v-card-title>
+
+          <v-card-subtitle>
+            {{ image.patient?.fullName }}
+          </v-card-subtitle>
+
+          <v-card-text>
+            <v-chip size="small" class="mr-1">
+              {{ image.analysisType }}
+            </v-chip>
+            <v-chip v-if="image.magnification" size="small">
+              {{ image.magnification }}
+            </v-chip>
+            <div class="text-caption text-grey-darken-1 mt-2">
+              {{ formatDate(image.createdAt) }}
+            </div>
+            <div v-if="image.annotations.length" class="text-caption text-primary mt-1">
+              <v-icon size="16">mdi-comment-text-outline</v-icon>
+              {{ image.annotations.length }} anotações
+            </div>
+          </v-card-text>
+
+          <v-card-actions>
+            <v-btn size="small" variant="text" @click.stop="openViewer(image)">
+              Visualizar
+            </v-btn>
+            <v-spacer />
+            <v-menu>
+              <template v-slot:activator="{ props }">
+                <v-btn icon="mdi-dots-vertical" size="small" v-bind="props" @click.stop />
+              </template>
+              <v-list>
+                <v-list-item @click="editImage(image)">
+                  <template v-slot:prepend>
+                    <v-icon>mdi-pencil</v-icon>
+                  </template>
+                  <v-list-item-title>Editar</v-list-item-title>
+                </v-list-item>
+                <v-list-item @click="deleteImage(image)">
+                  <template v-slot:prepend>
+                    <v-icon color="error">mdi-delete</v-icon>
+                  </template>
+                  <v-list-item-title class="text-error">Deletar</v-list-item-title>
+                </v-list-item>
+              </v-list>
+            </v-menu>
+          </v-card-actions>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <!-- Dialog de Upload -->
+    <v-dialog v-model="uploadDialog" max-width="600">
+      <v-card>
+        <v-card-title>Upload de Imagem Microscópica</v-card-title>
+
+        <v-card-text>
+          <v-form ref="uploadForm">
+            <v-file-input
+              v-model="uploadFile"
+              label="Selecione a imagem"
+              prepend-icon="mdi-camera"
+              accept="image/*"
+              variant="outlined"
+              :rules="[v => !!v || 'Imagem obrigatória']"
+              class="mb-4"
+            />
+
+            <v-text-field
+              v-model="uploadData.title"
+              label="Título"
+              variant="outlined"
+              class="mb-4"
+            />
+
+            <v-textarea
+              v-model="uploadData.description"
+              label="Descrição"
+              variant="outlined"
+              rows="3"
+              class="mb-4"
+            />
+
+            <v-autocomplete
+              v-model="uploadData.patientId"
+              :items="patients"
+              item-title="fullName"
+              item-value="id"
+              label="Paciente"
+              variant="outlined"
+              :rules="[v => !!v || 'Paciente obrigatório']"
+              class="mb-4"
+            />
+
+            <v-select
+              v-model="uploadData.analysisType"
+              :items="analysisTypes"
+              label="Tipo de Análise"
+              variant="outlined"
+              :rules="[v => !!v || 'Tipo obrigatório']"
+              class="mb-4"
+            />
+
+            <v-text-field
+              v-model="uploadData.magnification"
+              label="Ampliação (ex: 40x, 100x)"
+              variant="outlined"
+            />
+          </v-form>
+        </v-card-text>
+
+        <v-card-actions>
+          <v-spacer />
+          <v-btn @click="uploadDialog = false">Cancelar</v-btn>
+          <v-btn color="primary" :loading="uploading" @click="handleUpload">
+            Enviar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Dialog do Visualizador -->
+    <v-dialog v-model="viewerDialog" fullscreen>
+      <v-card>
+        <v-toolbar color="primary" dark>
+          <v-btn icon @click="viewerDialog = false">
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+          <v-toolbar-title>{{ selectedImage?.title || 'Visualizador' }}</v-toolbar-title>
+        </v-toolbar>
+
+        <MicroscopyViewer
+          v-if="selectedImage"
+          :image-id="selectedImage.id"
+          @saved="handleSaved"
+          @error="handleError"
+        />
+      </v-card>
+    </v-dialog>
+  </v-container>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import axios from 'axios'
+import MicroscopyViewer from '@/components/MicroscopyViewer.vue'
+
+interface MicroscopyImage {
+  id: string
+  fileUrl: string
+  thumbnailUrl?: string
+  title?: string
+  description?: string
+  analysisType: string
+  magnification?: string
+  createdAt: string
+  patient?: {
+    id: string
+    fullName: string
+  }
+  annotations: any[]
+}
+
+interface Patient {
+  id: string
+  fullName: string
+}
+
+const search = ref('')
+const filterType = ref<string | null>(null)
+const loading = ref(true)
+const images = ref<MicroscopyImage[]>([])
+const patients = ref<Patient[]>([])
+
+const uploadDialog = ref(false)
+const uploadFile = ref<File[]>([])
+const uploadData = ref({
+  title: '',
+  description: '',
+  patientId: '',
+  analysisType: 'campo_claro',
+  magnification: '',
+})
+const uploading = ref(false)
+const uploadForm = ref()
+
+const viewerDialog = ref(false)
+const selectedImage = ref<MicroscopyImage | null>(null)
+
+const analysisTypes = [
+  { title: 'Campo Claro', value: 'campo_claro' },
+  { title: 'Campo Escuro', value: 'campo_escuro' },
+  { title: 'Contraste de Fase', value: 'contraste_fase' },
+]
+
+const filteredImages = computed(() => {
+  let result = images.value
+
+  if (search.value) {
+    const searchLower = search.value.toLowerCase()
+    result = result.filter(
+      (img) =>
+        img.title?.toLowerCase().includes(searchLower) ||
+        img.patient?.fullName.toLowerCase().includes(searchLower)
+    )
+  }
+
+  if (filterType.value) {
+    result = result.filter((img) => img.analysisType === filterType.value)
+  }
+
+  return result
+})
+
+onMounted(async () => {
+  await Promise.all([loadImages(), loadPatients()])
+})
+
+async function loadImages() {
+  try {
+    loading.value = true
+    // TODO: Ajustar para listar todas as imagens ou filtrar por paciente
+    const response = await axios.get('/api/microscopy/all')
+    images.value = response.data
+  } catch (error) {
+    console.error('Erro ao carregar imagens:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function loadPatients() {
+  try {
+    const response = await axios.get('/api/patients')
+    patients.value = response.data
+  } catch (error) {
+    console.error('Erro ao carregar pacientes:', error)
+  }
+}
+
+async function handleUpload() {
+  const { valid } = await uploadForm.value.validate()
+  if (!valid || !uploadFile.value[0]) return
+
+  try {
+    uploading.value = true
+
+    const formData = new FormData()
+    formData.append('image', uploadFile.value[0])
+    formData.append('patientId', uploadData.value.patientId)
+    formData.append('title', uploadData.value.title)
+    formData.append('description', uploadData.value.description)
+    formData.append('analysisType', uploadData.value.analysisType)
+    formData.append('magnification', uploadData.value.magnification)
+
+    const response = await axios.post('/api/microscopy/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+
+    images.value.unshift(response.data)
+    uploadDialog.value = false
+    resetUploadForm()
+  } catch (error) {
+    console.error('Erro ao fazer upload:', error)
+    alert('Erro ao fazer upload da imagem')
+  } finally {
+    uploading.value = false
+  }
+}
+
+function resetUploadForm() {
+  uploadFile.value = []
+  uploadData.value = {
+    title: '',
+    description: '',
+    patientId: '',
+    analysisType: 'campo_claro',
+    magnification: '',
+  }
+}
+
+function openViewer(image: MicroscopyImage) {
+  selectedImage.value = image
+  viewerDialog.value = true
+}
+
+function editImage(image: MicroscopyImage) {
+  // TODO: Implementar edição
+  console.log('Edit:', image)
+}
+
+async function deleteImage(image: MicroscopyImage) {
+  if (!confirm('Tem certeza que deseja deletar esta imagem?')) return
+
+  try {
+    await axios.delete(`/api/microscopy/${image.id}`)
+    images.value = images.value.filter((img) => img.id !== image.id)
+  } catch (error) {
+    console.error('Erro ao deletar imagem:', error)
+    alert('Erro ao deletar imagem')
+  }
+}
+
+function handleSaved() {
+  alert('Anotações salvas com sucesso!')
+  loadImages()
+}
+
+function handleError(error: string) {
+  alert(error)
+}
+
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+</script>
+
+<style scoped>
+.v-card:hover {
+  transform: translateY(-2px);
+  transition: transform 0.2s;
+}
+</style>

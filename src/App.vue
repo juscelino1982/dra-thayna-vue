@@ -73,6 +73,13 @@ function logout() {
             class="mb-1"
           ></v-list-item>
           <v-list-item
+            prepend-icon="mdi-microscope"
+            title="Microscopia"
+            to="/microscopia"
+            rounded="lg"
+            class="mb-1"
+          ></v-list-item>
+          <v-list-item
             prepend-icon="mdi-calendar"
             title="Calendário"
             to="/calendario"
