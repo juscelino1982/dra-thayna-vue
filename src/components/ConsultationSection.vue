@@ -315,7 +315,6 @@ function resetRecordingState() {
 
 function openRecordingDialog(consultation: any) {
   console.log('[DEBUG] Abrindo modal de gravação para consulta:', consultation.id)
-  alert(`🎬 Abrindo gravador de áudio\n\nConsulta ID: ${consultation.id}\nNavegador: ${navigator.userAgent.substring(0, 50)}...`)
 
   currentRecordingConsultation.value = {
     id: consultation.id,
@@ -379,8 +378,6 @@ async function startRecording() {
     recordingDuration.value = 0
     recordingState.value = 'preparing'
 
-    alert('🎤 Solicitando permissão do microfone...')
-
     mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
@@ -400,12 +397,10 @@ async function startRecording() {
       ''
     ]
 
-    let selectedMimeType = ''
     for (const mimeType of mimeTypes) {
       if (mimeType === '' || MediaRecorder.isTypeSupported(mimeType)) {
         if (mimeType !== '') {
           options = { mimeType }
-          selectedMimeType = mimeType
         }
         console.log(`[Gravação] Usando MIME type: ${mimeType || 'padrão do navegador'}`)
         break
@@ -575,8 +570,6 @@ async function uploadRecordedAudio() {
       extension,
       blobType: recordedBlob.value.type
     })
-
-    alert(`📤 Enviando áudio...\n\nTamanho: ${(recordedBlob.value.size / 1024 / 1024).toFixed(2)} MB\nFormato: ${extension}\nTipo: ${mimeType}`)
 
     await uploadAudio(currentRecordingConsultation.value.id, file)
     closeRecordingDialog()
