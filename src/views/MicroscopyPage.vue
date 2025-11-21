@@ -440,6 +440,8 @@ function resetUploadForm() {
 }
 
 function openViewer(image: MicroscopyImage) {
+  alert('🔴 BOTÃO CLICADO! ID: ' + image.id)
+
   console.log('🖼️ Abrindo visualizador para imagem:', image)
   console.log('📋 ID da imagem:', image.id)
   console.log('🔗 URL da imagem:', image.fileUrl)

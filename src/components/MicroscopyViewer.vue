@@ -1,161 +1,3 @@
-<template>
-  <v-card class="microscopy-viewer" elevation="2">
-    <!-- Toolbar Superior -->
-    <v-toolbar density="compact" color="grey-lighten-4">
-      <v-toolbar-title class="text-subtitle-1">
-        <v-icon>mdi-microscope</v-icon>
-        {{ image?.title || 'Visualizador de Microscopia' }}
-      </v-toolbar-title>
-
-      <v-spacer />
-
-      <!-- Ferramentas de Anotação -->
-      <v-btn-toggle v-model="selectedTool" mandatory density="compact" class="mr-2">
-        <v-btn value="select" size="small">
-          <v-icon>mdi-cursor-default</v-icon>
-        </v-btn>
-        <v-btn value="circle" size="small">
-          <v-icon>mdi-circle-outline</v-icon>
-        </v-btn>
-        <v-btn value="arrow" size="small">
-          <v-icon>mdi-arrow-right</v-icon>
-        </v-btn>
-        <v-btn value="rectangle" size="small">
-          <v-icon>mdi-rectangle-outline</v-icon>
-        </v-btn>
-        <v-btn value="text" size="small">
-          <v-icon>mdi-format-text</v-icon>
-        </v-btn>
-      </v-btn-toggle>
-
-      <v-divider vertical class="mx-2" />
-
-      <!-- Cores -->
-      <v-menu>
-        <template v-slot:activator="{ props }">
-          <v-btn v-bind="props" size="small">
-            <v-icon :color="selectedColor">mdi-palette</v-icon>
-          </v-btn>
-        </template>
-        <v-card>
-          <v-card-text>
-            <v-color-picker v-model="selectedColor" mode="hex" hide-inputs />
-          </v-card-text>
-        </v-card>
-      </v-menu>
-
-      <v-divider vertical class="mx-2" />
-
-      <!-- Controles de Zoom -->
-      <v-btn size="small" @click="zoomIn" icon>
-        <v-icon>mdi-magnify-plus</v-icon>
-      </v-btn>
-      <v-btn size="small" @click="zoomOut" icon>
-        <v-icon>mdi-magnify-minus</v-icon>
-      </v-btn>
-      <v-btn size="small" @click="resetZoom" icon>
-        <v-icon>mdi-magnify</v-icon>
-      </v-btn>
-
-      <v-divider vertical class="mx-2" />
-
-      <!-- Ações -->
-      <v-btn size="small" @click="saveAnnotations" color="primary">
-        <v-icon left>mdi-content-save</v-icon>
-        Salvar
-      </v-btn>
-    </v-toolbar>
-
-    <!-- Área do Canvas -->
-    <v-row no-gutters>
-      <!-- Canvas Principal -->
-      <v-col :cols="showSidebar ? 9 : 12">
-        <div class="canvas-container" ref="canvasContainer">
-          <canvas ref="fabricCanvas"></canvas>
-        </div>
-      </v-col>
-
-      <!-- Sidebar de Anotações -->
-      <v-col v-if="showSidebar" cols="3">
-        <v-card flat class="annotations-sidebar">
-          <v-card-title class="text-subtitle-2 py-2">
-            Anotações ({{ annotations.length }})
-            <v-spacer />
-            <v-btn icon size="x-small" @click="showSidebar = false">
-              <v-icon>mdi-close</v-icon>
-            </v-btn>
-          </v-card-title>
-
-          <v-divider />
-
-          <v-list density="compact" class="py-0">
-            <v-list-item
-              v-for="(annotation, index) in annotations"
-              :key="annotation.id"
-              @click="selectAnnotation(annotation)"
-              :class="{ 'bg-primary-lighten-5': selectedAnnotation?.id === annotation.id }"
-            >
-              <template v-slot:prepend>
-                <v-avatar :color="annotation.color" size="24">
-                  <v-icon size="16" color="white">{{ getAnnotationIcon(annotation.type) }}</v-icon>
-                </v-avatar>
-              </template>
-
-              <v-list-item-title class="text-caption">
-                {{ annotation.label || `Anotação ${index + 1}` }}
-              </v-list-item-title>
-
-              <template v-slot:append>
-                <v-btn icon size="x-small" @click.stop="deleteAnnotation(annotation)">
-                  <v-icon size="16">mdi-delete</v-icon>
-                </v-btn>
-              </template>
-            </v-list-item>
-          </v-list>
-
-          <!-- Formulário de Edição -->
-          <v-card v-if="selectedAnnotation" flat class="pa-3 mt-2">
-            <v-text-field
-              v-model="selectedAnnotation.label"
-              label="Rótulo"
-              density="compact"
-              variant="outlined"
-              hide-details
-              class="mb-2"
-            />
-            <v-textarea
-              v-model="selectedAnnotation.notes"
-              label="Observações"
-              density="compact"
-              variant="outlined"
-              rows="3"
-              hide-details
-            />
-          </v-card>
-        </v-card>
-      </v-col>
-    </v-row>
-
-    <!-- Toolbar Inferior com Info -->
-    <v-toolbar density="compact" color="grey-lighten-5">
-      <v-toolbar-title class="text-caption">
-        {{ image?.analysisType }} | {{ image?.magnification || 'N/A' }} |
-        {{ image?.width }}x{{ image?.height }}px
-      </v-toolbar-title>
-      <v-spacer />
-      <v-btn size="small" @click="showSidebar = !showSidebar" variant="text">
-        <v-icon>{{ showSidebar ? 'mdi-chevron-right' : 'mdi-chevron-left' }}</v-icon>
-        Anotações
-      </v-btn>
-    </v-toolbar>
-
-    <!-- Loading -->
-    <v-overlay v-model="loading" contained class="align-center justify-center">
-      <v-progress-circular indeterminate color="primary" />
-    </v-overlay>
-  </v-card>
-</template>
-
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import axios from 'axios'
@@ -464,6 +306,166 @@ function resetZoom() {
   drawCanvas()
 }
 </script>
+
+<template>
+  <v-card class="microscopy-viewer" elevation="2">
+    <!-- Toolbar Superior -->
+    <v-toolbar density="compact" color="grey-lighten-4">
+      <v-toolbar-title class="text-subtitle-1">
+        <v-icon>mdi-microscope</v-icon>
+        {{ image?.title || 'Visualizador de Microscopia' }}
+      </v-toolbar-title>
+
+      <v-spacer />
+
+      <!-- Ferramentas de Anotação -->
+      <v-btn-toggle v-model="selectedTool" mandatory density="compact" class="mr-2">
+        <v-btn value="select" size="small">
+          <v-icon>mdi-cursor-default</v-icon>
+        </v-btn>
+        <v-btn value="circle" size="small">
+          <v-icon>mdi-circle-outline</v-icon>
+        </v-btn>
+        <v-btn value="arrow" size="small">
+          <v-icon>mdi-arrow-right</v-icon>
+        </v-btn>
+        <v-btn value="rectangle" size="small">
+          <v-icon>mdi-rectangle-outline</v-icon>
+        </v-btn>
+        <v-btn value="text" size="small">
+          <v-icon>mdi-format-text</v-icon>
+        </v-btn>
+      </v-btn-toggle>
+
+      <v-divider vertical class="mx-2" />
+
+      <!-- Cores -->
+      <v-menu>
+        <template v-slot:activator="{ props }">
+          <v-btn v-bind="props" size="small">
+            <v-icon :color="selectedColor">mdi-palette</v-icon>
+          </v-btn>
+        </template>
+        <v-card>
+          <v-card-text>
+            <v-color-picker v-model="selectedColor" mode="hex" hide-inputs />
+          </v-card-text>
+        </v-card>
+      </v-menu>
+
+      <v-divider vertical class="mx-2" />
+
+      <!-- Controles de Zoom -->
+      <v-btn size="small" @click="zoomIn" icon>
+        <v-icon>mdi-magnify-plus</v-icon>
+      </v-btn>
+      <v-btn size="small" @click="zoomOut" icon>
+        <v-icon>mdi-magnify-minus</v-icon>
+      </v-btn>
+      <v-btn size="small" @click="resetZoom" icon>
+        <v-icon>mdi-magnify</v-icon>
+      </v-btn>
+
+      <v-divider vertical class="mx-2" />
+
+      <!-- Ações -->
+      <v-btn size="small" @click="saveAnnotations" color="primary">
+        <v-icon left>mdi-content-save</v-icon>
+        Salvar
+      </v-btn>
+    </v-toolbar>
+
+    <!-- Área do Canvas -->
+    <v-row no-gutters>
+      <!-- Canvas Principal -->
+      <v-col :cols="showSidebar ? 9 : 12">
+        <div class="canvas-container" ref="canvasContainer">
+          <canvas ref="fabricCanvas"></canvas>
+        </div>
+      </v-col>
+
+      <!-- Sidebar de Anotações -->
+      <v-col v-if="showSidebar" cols="3">
+        <v-card flat class="annotations-sidebar">
+          <v-card-title class="text-subtitle-2 py-2">
+            Anotações ({{ annotations.length }})
+            <v-spacer />
+            <v-btn icon size="x-small" @click="showSidebar = false">
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </v-card-title>
+
+          <v-divider />
+
+          <v-list density="compact" class="py-0">
+            <v-list-item
+              v-for="(annotation, index) in annotations"
+              :key="annotation.id"
+              @click="selectAnnotation(annotation)"
+              :class="{ 'bg-primary-lighten-5': selectedAnnotation?.id === annotation.id }"
+            >
+              <template v-slot:prepend>
+                <v-avatar :color="annotation.color" size="24">
+                  <v-icon size="16" color="white">{{ getAnnotationIcon(annotation.type) }}</v-icon>
+                </v-avatar>
+              </template>
+
+              <v-list-item-title class="text-caption">
+                {{ annotation.label || `Anotação ${index + 1}` }}
+              </v-list-item-title>
+
+              <template v-slot:append>
+                <v-btn icon size="x-small" @click.stop="deleteAnnotation(annotation)">
+                  <v-icon size="16">mdi-delete</v-icon>
+                </v-btn>
+              </template>
+            </v-list-item>
+          </v-list>
+
+          <!-- Formulário de Edição -->
+          <v-card v-if="selectedAnnotation" flat class="pa-3 mt-2">
+            <v-text-field
+              v-model="selectedAnnotation.label"
+              label="Rótulo"
+              density="compact"
+              variant="outlined"
+              hide-details
+              class="mb-2"
+            />
+            <v-textarea
+              v-model="selectedAnnotation.notes"
+              label="Observações"
+              density="compact"
+              variant="outlined"
+              rows="3"
+              hide-details
+            />
+          </v-card>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <!-- Toolbar Inferior com Info -->
+    <v-toolbar density="compact" color="grey-lighten-5">
+      <v-toolbar-title class="text-caption">
+        {{ image?.analysisType }} | {{ image?.magnification || 'N/A' }} |
+        {{ image?.width }}x{{ image?.height }}px
+      </v-toolbar-title>
+      <v-spacer />
+      <v-btn size="small" @click="showSidebar = !showSidebar" variant="text">
+        <v-icon>{{ showSidebar ? 'mdi-chevron-right' : 'mdi-chevron-left' }}</v-icon>
+        Anotações
+      </v-btn>
+    </v-toolbar>
+
+    <!-- Loading -->
+    <v-overlay v-model="loading" contained class="align-center justify-center">
+      <v-progress-circular indeterminate color="primary" />
+    </v-overlay>
+  </v-card>
+</template>
+
+
 
 <style scoped>
 .microscopy-viewer {
