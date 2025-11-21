@@ -192,7 +192,6 @@ async function uploadAudio(consultationId: string, file: File) {
     )
 
     console.log('[Upload Áudio] Resposta recebida:', response.data)
-    alert(response.data?.message || 'Áudio enviado! Transcrição em andamento...')
 
     await fetchConsultations()
   } catch (error: any) {
@@ -203,16 +202,16 @@ async function uploadAudio(consultationId: string, file: File) {
 
     // Identificar tipo de erro de conexão
     if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-      errorMsg = 'Timeout: O upload demorou muito. Tente com uma conexão melhor ou com um áudio menor.'
+      errorMsg = 'Timeout: O upload demorou muito'
     } else if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
-      errorMsg = 'Erro de rede: Verifique sua conexão com a internet.'
+      errorMsg = 'Erro de rede'
     } else if (error.message?.includes('Connection error')) {
-      errorMsg = 'Erro de conexão: A conexão foi interrompida durante o upload.'
+      errorMsg = 'Erro de conexão'
     } else {
       errorMsg = error.response?.data?.error || error.message || 'Erro desconhecido'
     }
 
-    alert(`❌ Erro ao enviar áudio:\n\n${errorMsg}\n\nCódigo: ${error.code || 'N/A'}\nStatus: ${error.response?.status || 'N/A'}`)
+    alert(`Erro na legenda\n${errorMsg}`)
   } finally {
     uploadingAudio.value = false
   }
