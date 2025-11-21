@@ -3,6 +3,7 @@ import express from 'express'
 import cors from 'cors'
 
 // Import routes
+import authRouter from '../server/routes/auth.js'
 import patientsRouter from '../server/routes/patients.js'
 import consultationsRouter from '../server/routes/consultations.js'
 import reportsRouter from '../server/routes/reports.js'
@@ -18,6 +19,7 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
 // Routes
+app.use('/api/auth', authRouter)
 app.use('/api/patients', patientsRouter)
 app.use('/api/consultations', consultationsRouter)
 app.use('/api/reports', reportsRouter)
