@@ -9,10 +9,40 @@
               Visualize e anote imagens microscópicas de análise de sangue vivo
             </p>
           </div>
-          <v-btn color="primary" size="large" prepend-icon="mdi-upload" @click="uploadDialog = true">
-            Upload de Imagem
-          </v-btn>
         </div>
+      </v-col>
+    </v-row>
+
+    <!-- Seleção de Paciente e Upload -->
+    <v-row class="mb-4">
+      <v-col cols="12" md="6">
+        <v-autocomplete
+          v-model="selectedPatientId"
+          :items="patients"
+          item-title="fullName"
+          item-value="id"
+          label="Selecionar Paciente para Upload"
+          variant="outlined"
+          prepend-inner-icon="mdi-account"
+          :loading="patientsLoading"
+          :no-data-text="patientsLoading ? 'Carregando pacientes...' : 'Nenhum paciente encontrado'"
+          clearable
+          auto-select-first
+          hint="Selecione o paciente antes de fazer upload"
+          persistent-hint
+        />
+      </v-col>
+      <v-col cols="12" md="6" class="d-flex align-end">
+        <v-btn
+          color="primary"
+          size="large"
+          prepend-icon="mdi-upload"
+          :disabled="!selectedPatientId"
+          @click="uploadDialog = true"
+          block
+        >
+          Upload de Imagem
+        </v-btn>
       </v-col>
     </v-row>
 
@@ -163,18 +193,15 @@
               class="mb-4"
             />
 
-            <v-autocomplete
-              v-model="uploadData.patientId"
-              :items="patients"
-              item-title="fullName"
-              item-value="id"
+            <v-text-field
+              :model-value="getSelectedPatientName()"
               label="Paciente"
               variant="outlined"
-              :rules="[v => !!v || 'Paciente obrigatório']"
-              :loading="patientsLoading"
-              :no-data-text="patientsLoading ? 'Carregando pacientes...' : 'Nenhum paciente encontrado'"
-              clearable
-              auto-select-first
+              prepend-inner-icon="mdi-account"
+              disabled
+              readonly
+              hint="Paciente selecionado na página principal"
+              persistent-hint
               class="mb-4"
             />
 
@@ -260,13 +287,13 @@ const loading = ref(true)
 const patientsLoading = ref(false)
 const images = ref<MicroscopyImage[]>([])
 const patients = ref<Patient[]>([])
+const selectedPatientId = ref<string | null>(null)
 
 const uploadDialog = ref(false)
 const uploadFile = ref<File[]>([])
 const uploadData = ref({
   title: '',
   description: '',
-  patientId: '',
   analysisType: 'campo_claro',
   magnification: '',
 })
@@ -353,12 +380,17 @@ async function handleUpload() {
   const { valid } = await uploadForm.value.validate()
   if (!valid || !uploadFile.value[0]) return
 
+  if (!selectedPatientId.value) {
+    alert('Por favor, selecione um paciente primeiro')
+    return
+  }
+
   try {
     uploading.value = true
 
     const formData = new FormData()
     formData.append('image', uploadFile.value[0])
-    formData.append('patientId', uploadData.value.patientId)
+    formData.append('patientId', selectedPatientId.value)
     formData.append('title', uploadData.value.title)
     formData.append('description', uploadData.value.description)
     formData.append('analysisType', uploadData.value.analysisType)
@@ -381,12 +413,17 @@ async function handleUpload() {
   }
 }
 
+function getSelectedPatientName(): string {
+  if (!selectedPatientId.value) return ''
+  const patient = patients.value.find(p => p.id === selectedPatientId.value)
+  return patient?.fullName || ''
+}
+
 function resetUploadForm() {
   uploadFile.value = []
   uploadData.value = {
     title: '',
     description: '',
-    patientId: '',
     analysisType: 'campo_claro',
     magnification: '',
   }
