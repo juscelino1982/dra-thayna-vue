@@ -581,7 +581,7 @@ function resetZoom() {
           <v-icon>mdi-cursor-default</v-icon>
         </v-btn>
         <v-btn value="pan" size="small">
-          <v-icon>mdi-hand-back-right</v-icon>
+          <v-icon>mdi-cursor-move</v-icon>
         </v-btn>
         <v-btn value="circle" size="small">
           <v-icon>mdi-circle-outline</v-icon>
