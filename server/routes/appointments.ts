@@ -4,7 +4,7 @@
  * CRUD completo de agendamentos sem integraçõesexternas
  */
 
-import express, { Request, Response } from 'express'
+import express from 'express'
 import { prisma } from '../lib/prisma.js'
 import { getDefaultUserId } from '../utils/ensure-default-user.js'
 
@@ -43,7 +43,7 @@ const router = express.Router()
  *       200:
  *         description: Lista de agendamentos
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (req, res) => {
   const { patientId, userId, status, startDate, endDate } = req.query
 
   try {
@@ -108,7 +108,7 @@ router.get('/', async (req: Request, res: Response) => {
  *       404:
  *         description: Agendamento não encontrado
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', async (req, res) => {
   const { id } = req.params
 
   try {
@@ -175,7 +175,7 @@ router.get('/:id', async (req: Request, res: Response) => {
  *       201:
  *         description: Agendamento criado
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', async (req, res) => {
   const {
     patientId,
     userId,
@@ -285,7 +285,7 @@ router.post('/', async (req: Request, res: Response) => {
  *       200:
  *         description: Agendamento atualizado
  */
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', async (req, res) => {
   const { id } = req.params
   const data = req.body
 
@@ -334,7 +334,7 @@ router.put('/:id', async (req: Request, res: Response) => {
  *       200:
  *         description: Agendamento deletado
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', async (req, res) => {
   const { id } = req.params
 
   try {
@@ -376,7 +376,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
  *       200:
  *         description: Agendamento cancelado
  */
-router.post('/:id/cancel', async (req: Request, res: Response) => {
+router.post('/:id/cancel', async (req, res) => {
   const { id } = req.params
   const { reason } = req.body
 
