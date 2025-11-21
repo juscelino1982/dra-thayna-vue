@@ -22,13 +22,12 @@
               </h2>
 
               <p class="text-body-1 text-grey-lighten-3 mb-8">
-                Plataforma completa para medicina integrativa com análise inteligente de exames,
-                gestão de pacientes e acompanhamento personalizado.
+                Plataforma completa para gestão clínica inteligente com acompanhamento personalizado de pacientes.
               </p>
 
               <v-row class="mt-8">
                 <v-col cols="12" sm="4" v-for="feature in features" :key="feature.icon">
-                  <v-icon :icon="feature.icon" size="48" color="primary" class="mb-2" />
+                  <v-icon :icon="feature.icon" size="48" color="white" class="mb-2" />
                   <div class="text-body-2 text-white font-weight-medium">{{ feature.title }}</div>
                   <div class="text-caption text-grey-lighten-2">{{ feature.description }}</div>
                 </v-col>
@@ -133,19 +132,19 @@ const formRef = ref()
 
 const features = [
   {
-    icon: 'mdi-test-tube',
-    title: 'Análise Inteligente',
-    description: 'IA para análise de exames',
+    icon: 'mdi-account-heart',
+    title: 'Gestão de Pacientes',
+    description: 'Cadastro e histórico completo',
   },
   {
-    icon: 'mdi-account-heart',
-    title: 'Gestão Completa',
-    description: 'Pacientes e consultas',
+    icon: 'mdi-calendar-check',
+    title: 'Agendamentos',
+    description: 'Controle de consultas',
   },
   {
     icon: 'mdi-chart-line',
     title: 'Acompanhamento',
-    description: 'Evolução detalhada',
+    description: 'Relatórios e evolução',
   },
 ]
 

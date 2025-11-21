@@ -91,17 +91,15 @@ function logout() {
 
 <style scoped>
 .app-bar-clean {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid rgba(102, 126, 234, 0.1);
 }
 
 .drawer-clean {
-  border-right: 1px solid rgba(0, 0, 0, 0.05);
+  border-right: 1px solid rgba(102, 126, 234, 0.1);
+  background: #fafbff !important;
 }
 
 .main-clean {
-  background: #f8f9fa;
+  background: #ffffff;
 }
-</style>
-
-<style scoped>
 </style>

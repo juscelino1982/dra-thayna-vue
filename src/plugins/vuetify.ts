@@ -4,18 +4,18 @@ import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 import '@mdi/font/css/materialdesignicons.css'
 
-const emeraldTheme = {
+const clinicTheme = {
   dark: false,
   colors: {
-    primary: '#10B981', // emerald-500
-    secondary: '#14B8A6', // teal-500
-    accent: '#06B6D4', // cyan-500
-    error: '#EF4444', // red-500
-    info: '#3B82F6', // blue-500
-    success: '#10B981', // emerald-500
-    warning: '#F59E0B', // amber-500
-    background: '#F0FDF4', // emerald-50
-    surface: '#FFFFFF',
+    primary: '#667eea', // Roxo principal da landing
+    secondary: '#764ba2', // Roxo mais escuro
+    accent: '#a78bfa', // Roxo claro
+    error: '#ef4444', // Vermelho
+    info: '#3b82f6', // Azul
+    success: '#10b981', // Verde
+    warning: '#f59e0b', // Amarelo
+    background: '#ffffff', // Branco puro
+    surface: '#ffffff', // Branco puro
   },
 }
 
@@ -23,9 +23,9 @@ export default createVuetify({
   components,
   directives,
   theme: {
-    defaultTheme: 'emeraldTheme',
+    defaultTheme: 'clinicTheme',
     themes: {
-      emeraldTheme,
+      clinicTheme,
     },
   },
   icons: {
