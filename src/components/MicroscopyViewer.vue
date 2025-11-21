@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import axios from 'axios'
 
 interface MicroscopyImage {
@@ -21,6 +21,7 @@ interface ImageAnnotation {
   notes?: string
   color: string
   opacity: number
+  fontSize?: number
 }
 
 const props = defineProps<{
@@ -50,17 +51,31 @@ const selectedAnnotation = ref<ImageAnnotation | null>(null)
 let scale = 1
 let offsetX = 0
 let offsetY = 0
+let isPanning = false
+let panStartX = 0
+let panStartY = 0
 
 // Lifecycle
 onMounted(async () => {
   await loadImage()
+  // Aguardar o próximo tick para garantir que o DOM está renderizado
+  await nextTick()
+  // Inicializar canvas após DOM estar pronto
   initCanvas()
 })
 
 // Watch tool changes
 watch(selectedTool, (newTool) => {
   if (!fabricCanvas.value) return
-  fabricCanvas.value.style.cursor = newTool === 'select' ? 'default' : 'crosshair'
+  const cursorMap: Record<string, string> = {
+    select: 'default',
+    pan: 'grab',
+    text: 'text',
+    circle: 'crosshair',
+    arrow: 'crosshair',
+    rectangle: 'crosshair'
+  }
+  fabricCanvas.value.style.cursor = cursorMap[newTool] || 'crosshair'
 })
 
 // Methods
@@ -79,14 +94,28 @@ async function loadImage() {
 }
 
 function initCanvas() {
-  if (!fabricCanvas.value || !canvasContainer.value || !image.value) return
+  if (!fabricCanvas.value || !canvasContainer.value || !image.value) {
+    console.warn('Canvas não pode ser inicializado: elementos não encontrados')
+    return
+  }
 
   const canvas = fabricCanvas.value
   ctx = canvas.getContext('2d')
-  if (!ctx) return
+  if (!ctx) {
+    console.error('Não foi possível obter contexto 2D do canvas')
+    return
+  }
 
-  canvas.width = canvasContainer.value.clientWidth
-  canvas.height = 600
+  // Definir tamanho do canvas
+  const containerWidth = canvasContainer.value.clientWidth
+  if (containerWidth > 0) {
+    canvas.width = containerWidth
+    canvas.height = 600
+  } else {
+    // Fallback se o container ainda não tem largura
+    canvas.width = 800
+    canvas.height = 600
+  }
 
   // Carregar imagem de fundo
   backgroundImage = new Image()
@@ -94,12 +123,71 @@ function initCanvas() {
   backgroundImage.onload = () => {
     drawCanvas()
   }
+  backgroundImage.onerror = () => {
+    console.error('Erro ao carregar imagem de fundo')
+  }
   backgroundImage.src = image.value.fileUrl
 
-  // Event listeners
+  // Remover listeners antigos se existirem
+  canvas.removeEventListener('mousedown', handleMouseDown)
+  canvas.removeEventListener('mousemove', handleMouseMove)
+  canvas.removeEventListener('mouseup', handleMouseUp)
+  canvas.removeEventListener('wheel', handleWheel)
+
+  // Adicionar event listeners
   canvas.addEventListener('mousedown', handleMouseDown)
   canvas.addEventListener('mousemove', handleMouseMove)
   canvas.addEventListener('mouseup', handleMouseUp)
+  canvas.addEventListener('wheel', handleWheel, { passive: false })
+}
+
+// Cleanup ao desmontar o componente
+onBeforeUnmount(() => {
+  if (fabricCanvas.value) {
+    fabricCanvas.value.removeEventListener('mousedown', handleMouseDown)
+    fabricCanvas.value.removeEventListener('mousemove', handleMouseMove)
+    fabricCanvas.value.removeEventListener('mouseup', handleMouseUp)
+    fabricCanvas.value.removeEventListener('wheel', handleWheel)
+  }
+})
+
+// Funções auxiliares para transformação de coordenadas
+function getImageTransform() {
+  if (!fabricCanvas.value || !backgroundImage) return null
+
+  const imgScale = Math.min(
+    fabricCanvas.value.width / backgroundImage.width,
+    fabricCanvas.value.height / backgroundImage.height
+  ) * scale
+
+  const imgWidth = backgroundImage.width * imgScale
+  const imgHeight = backgroundImage.height * imgScale
+  const x = (fabricCanvas.value.width - imgWidth) / 2 + offsetX
+  const y = (fabricCanvas.value.height - imgHeight) / 2 + offsetY
+
+  return { x, y, width: imgWidth, height: imgHeight, scale: imgScale }
+}
+
+// Converter coordenadas do canvas para coordenadas da imagem original
+function canvasToImageCoords(canvasX: number, canvasY: number) {
+  const transform = getImageTransform()
+  if (!transform || !backgroundImage) return { x: canvasX, y: canvasY }
+
+  const imgX = (canvasX - transform.x) / transform.scale
+  const imgY = (canvasY - transform.y) / transform.scale
+
+  return { x: imgX, y: imgY }
+}
+
+// Converter coordenadas da imagem original para coordenadas do canvas
+function imageToCanvasCoords(imgX: number, imgY: number) {
+  const transform = getImageTransform()
+  if (!transform) return { x: imgX, y: imgY }
+
+  const canvasX = imgX * transform.scale + transform.x
+  const canvasY = imgY * transform.scale + transform.y
+
+  return { x: canvasX, y: canvasY }
 }
 
 function drawCanvas() {
@@ -134,28 +222,74 @@ function drawAnnotation(annotation: ImageAnnotation) {
   if (!ctx) return
 
   ctx.strokeStyle = annotation.color
+  ctx.fillStyle = annotation.color
   ctx.lineWidth = 2
   ctx.globalAlpha = annotation.opacity
 
   const data = annotation.data
 
   switch (annotation.type) {
-    case 'circle':
+    case 'circle': {
+      const center = imageToCanvasCoords(data.x, data.y)
+      const transform = getImageTransform()
+      const radius = data.radius * (transform?.scale || 1)
+
       ctx.beginPath()
-      ctx.arc(data.x, data.y, data.radius, 0, 2 * Math.PI)
+      ctx.arc(center.x, center.y, radius, 0, 2 * Math.PI)
       ctx.stroke()
       break
+    }
 
-    case 'rectangle':
-      ctx.strokeRect(data.x, data.y, data.width, data.height)
+    case 'rectangle': {
+      const topLeft = imageToCanvasCoords(data.x, data.y)
+      const transform = getImageTransform()
+      const width = data.width * (transform?.scale || 1)
+      const height = data.height * (transform?.scale || 1)
+
+      ctx.strokeRect(topLeft.x, topLeft.y, width, height)
       break
+    }
 
-    case 'arrow':
+    case 'arrow': {
+      const start = imageToCanvasCoords(data.x1, data.y1)
+      const end = imageToCanvasCoords(data.x2, data.y2)
+
+      // Desenhar linha
       ctx.beginPath()
-      ctx.moveTo(data.x1, data.y1)
-      ctx.lineTo(data.x2, data.y2)
+      ctx.moveTo(start.x, start.y)
+      ctx.lineTo(end.x, end.y)
+      ctx.stroke()
+
+      // Desenhar ponta da seta
+      const angle = Math.atan2(end.y - start.y, end.x - start.x)
+      const arrowLength = 15
+      const arrowAngle = Math.PI / 6
+
+      ctx.beginPath()
+      ctx.moveTo(end.x, end.y)
+      ctx.lineTo(
+        end.x - arrowLength * Math.cos(angle - arrowAngle),
+        end.y - arrowLength * Math.sin(angle - arrowAngle)
+      )
+      ctx.moveTo(end.x, end.y)
+      ctx.lineTo(
+        end.x - arrowLength * Math.cos(angle + arrowAngle),
+        end.y - arrowLength * Math.sin(angle + arrowAngle)
+      )
       ctx.stroke()
       break
+    }
+
+    case 'text': {
+      const pos = imageToCanvasCoords(data.x, data.y)
+      const fontSize = annotation.fontSize || 16
+      const transform = getImageTransform()
+      const scaledFontSize = fontSize * (transform?.scale || 1)
+
+      ctx.font = `${scaledFontSize}px Arial`
+      ctx.fillText(data.text || '', pos.x, pos.y)
+      break
+    }
   }
 
   ctx.globalAlpha = 1
@@ -167,54 +301,114 @@ let startY = 0
 let currentAnnotation: Partial<ImageAnnotation> | null = null
 
 function handleMouseDown(e: MouseEvent) {
-  if (!fabricCanvas.value || selectedTool.value === 'select') return
+  if (!fabricCanvas.value) return
 
   const rect = fabricCanvas.value.getBoundingClientRect()
-  startX = e.clientX - rect.left
-  startY = e.clientY - rect.top
+  const canvasX = e.clientX - rect.left
+  const canvasY = e.clientY - rect.top
+
+  // Modo Pan
+  if (selectedTool.value === 'pan' || e.button === 1) {
+    isPanning = true
+    panStartX = canvasX - offsetX
+    panStartY = canvasY - offsetY
+    if (fabricCanvas.value) {
+      fabricCanvas.value.style.cursor = 'grabbing'
+    }
+    return
+  }
+
+  // Modo Select - não faz nada no mousedown
+  if (selectedTool.value === 'select') return
+
+  // Modo Text - criar anotação de texto
+  if (selectedTool.value === 'text') {
+    const imgCoords = canvasToImageCoords(canvasX, canvasY)
+    const text = prompt('Digite o texto da anotação:')
+
+    if (text) {
+      const newAnnotation: ImageAnnotation = {
+        id: `temp-${Date.now()}`,
+        type: 'text',
+        color: selectedColor.value,
+        opacity: 1,
+        fontSize: 16,
+        data: { x: imgCoords.x, y: imgCoords.y, text },
+      }
+      annotations.value.push(newAnnotation)
+      drawCanvas()
+    }
+
+    selectedTool.value = 'select'
+    return
+  }
+
+  // Outros modos de desenho
+  startX = canvasX
+  startY = canvasY
   isDrawing = true
+
+  const imgCoords = canvasToImageCoords(canvasX, canvasY)
 
   currentAnnotation = {
     id: `temp-${Date.now()}`,
     type: selectedTool.value,
     color: selectedColor.value,
     opacity: 0.7,
-    data: {},
+    data: { x: imgCoords.x, y: imgCoords.y },
   }
 }
 
 function handleMouseMove(e: MouseEvent) {
-  if (!fabricCanvas.value || !isDrawing || !currentAnnotation) return
+  if (!fabricCanvas.value) return
 
   const rect = fabricCanvas.value.getBoundingClientRect()
-  const currentX = e.clientX - rect.left
-  const currentY = e.clientY - rect.top
+  const canvasX = e.clientX - rect.left
+  const canvasY = e.clientY - rect.top
+
+  // Modo Pan
+  if (isPanning) {
+    offsetX = canvasX - panStartX
+    offsetY = canvasY - panStartY
+    drawCanvas()
+    return
+  }
+
+  // Desenho de anotações
+  if (!isDrawing || !currentAnnotation) return
+
+  const startImgCoords = canvasToImageCoords(startX, startY)
+  const currentImgCoords = canvasToImageCoords(canvasX, canvasY)
 
   switch (selectedTool.value) {
-    case 'circle':
+    case 'circle': {
       const radius = Math.sqrt(
-        Math.pow(currentX - startX, 2) + Math.pow(currentY - startY, 2)
+        Math.pow(currentImgCoords.x - startImgCoords.x, 2) +
+          Math.pow(currentImgCoords.y - startImgCoords.y, 2)
       )
-      currentAnnotation.data = { x: startX, y: startY, radius }
+      currentAnnotation.data = { x: startImgCoords.x, y: startImgCoords.y, radius }
       break
+    }
 
-    case 'rectangle':
+    case 'rectangle': {
       currentAnnotation.data = {
-        x: startX,
-        y: startY,
-        width: currentX - startX,
-        height: currentY - startY,
+        x: startImgCoords.x,
+        y: startImgCoords.y,
+        width: currentImgCoords.x - startImgCoords.x,
+        height: currentImgCoords.y - startImgCoords.y,
       }
       break
+    }
 
-    case 'arrow':
+    case 'arrow': {
       currentAnnotation.data = {
-        x1: startX,
-        y1: startY,
-        x2: currentX,
-        y2: currentY,
+        x1: startImgCoords.x,
+        y1: startImgCoords.y,
+        x2: currentImgCoords.x,
+        y2: currentImgCoords.y,
       }
       break
+    }
   }
 
   drawCanvas()
@@ -224,17 +418,78 @@ function handleMouseMove(e: MouseEvent) {
 }
 
 function handleMouseUp() {
+  // Finalizar pan
+  if (isPanning) {
+    isPanning = false
+    if (fabricCanvas.value) {
+      fabricCanvas.value.style.cursor = selectedTool.value === 'pan' ? 'grab' : 'default'
+    }
+    return
+  }
+
+  // Finalizar desenho
   if (!isDrawing || !currentAnnotation) return
 
   isDrawing = false
 
-  if (currentAnnotation.data) {
+  // Validar dados da anotação antes de adicionar
+  if (currentAnnotation.data && validateAnnotation(currentAnnotation as ImageAnnotation)) {
     annotations.value.push(currentAnnotation as ImageAnnotation)
   }
 
   currentAnnotation = null
   selectedTool.value = 'select'
   drawCanvas()
+}
+
+// Adicionar função de wheel para zoom
+function handleWheel(e: WheelEvent) {
+  e.preventDefault()
+
+  const delta = e.deltaY > 0 ? 0.9 : 1.1
+  const oldScale = scale
+  scale *= delta
+
+  // Limitar zoom
+  scale = Math.max(0.1, Math.min(scale, 10))
+
+  // Ajustar offset para zoom centrado no cursor
+  if (fabricCanvas.value) {
+    const rect = fabricCanvas.value.getBoundingClientRect()
+    const mouseX = e.clientX - rect.left
+    const mouseY = e.clientY - rect.top
+
+    const scaleChange = scale / oldScale
+    offsetX = mouseX - (mouseX - offsetX) * scaleChange
+    offsetY = mouseY - (mouseY - offsetY) * scaleChange
+  }
+
+  drawCanvas()
+}
+
+// Validar anotação antes de salvar
+function validateAnnotation(annotation: ImageAnnotation): boolean {
+  if (!annotation.data) return false
+
+  switch (annotation.type) {
+    case 'circle':
+      return annotation.data.radius > 5 // Raio mínimo
+
+    case 'rectangle':
+      return Math.abs(annotation.data.width) > 5 && Math.abs(annotation.data.height) > 5
+
+    case 'arrow':
+      const dx = annotation.data.x2 - annotation.data.x1
+      const dy = annotation.data.y2 - annotation.data.y1
+      const length = Math.sqrt(dx * dx + dy * dy)
+      return length > 10 // Comprimento mínimo
+
+    case 'text':
+      return annotation.data.text && annotation.data.text.trim().length > 0
+
+    default:
+      return false
+  }
 }
 
 function selectAnnotation(annotation: ImageAnnotation) {
@@ -290,12 +545,14 @@ function getAnnotationIcon(type: string) {
 }
 
 function zoomIn() {
-  scale *= 1.1
+  scale *= 1.2
+  scale = Math.min(scale, 10) // Limitar zoom máximo
   drawCanvas()
 }
 
 function zoomOut() {
-  scale /= 1.1
+  scale /= 1.2
+  scale = Math.max(scale, 0.1) // Limitar zoom mínimo
   drawCanvas()
 }
 
@@ -322,6 +579,9 @@ function resetZoom() {
       <v-btn-toggle v-model="selectedTool" mandatory density="compact" class="mr-2">
         <v-btn value="select" size="small">
           <v-icon>mdi-cursor-default</v-icon>
+        </v-btn>
+        <v-btn value="pan" size="small">
+          <v-icon>mdi-hand-back-right</v-icon>
         </v-btn>
         <v-btn value="circle" size="small">
           <v-icon>mdi-circle-outline</v-icon>
