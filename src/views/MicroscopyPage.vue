@@ -98,7 +98,7 @@
         md="4"
         lg="3"
       >
-        <v-card elevation="2" hover @click="openViewer(image)">
+        <v-card elevation="2" hover>
           <v-img
             :src="image.thumbnailUrl || image.fileUrl"
             height="200"
@@ -137,12 +137,12 @@
           <v-card-actions>
             <v-btn
               color="primary"
-              variant="tonal"
-              prepend-icon="mdi-eye"
-              @click.stop="openViewer(image)"
+              variant="elevated"
+              size="large"
               block
+              @click="visualizarMicroscopia(image)"
             >
-              Visualizar Imagem
+              Visualizar Microscopia
             </v-btn>
           </v-card-actions>
 
@@ -150,8 +150,7 @@
             <v-btn
               size="small"
               variant="text"
-              prepend-icon="mdi-pencil"
-              @click.stop="editImage(image)"
+              @click="editImage(image)"
             >
               Editar
             </v-btn>
@@ -160,8 +159,7 @@
               size="small"
               variant="text"
               color="error"
-              prepend-icon="mdi-delete"
-              @click.stop="deleteImage(image)"
+              @click="deleteImage(image)"
             >
               Deletar
             </v-btn>
@@ -439,24 +437,15 @@ function resetUploadForm() {
   }
 }
 
-function openViewer(image: MicroscopyImage) {
-  alert('🔴 BOTÃO CLICADO! ID: ' + image.id)
-
-  console.log('🖼️ Abrindo visualizador para imagem:', image)
-  console.log('📋 ID da imagem:', image.id)
-  console.log('🔗 URL da imagem:', image.fileUrl)
+function visualizarMicroscopia(image: MicroscopyImage) {
+  alert('🔴 TESTE: Botão clicado! ID da imagem: ' + image.id)
 
   selectedImage.value = image
   viewerDialog.value = true
-
-  console.log('✅ selectedImage definido:', selectedImage.value)
-  console.log('✅ viewerDialog aberto:', viewerDialog.value)
-  console.log('🎯 MicroscopyViewer será renderizado com imageId:', image.id)
 }
 
 function editImage(image: MicroscopyImage) {
-  // TODO: Implementar edição
-  console.log('Edit:', image)
+  alert('Editar imagem: ' + image.id)
 }
 
 async function deleteImage(image: MicroscopyImage) {
