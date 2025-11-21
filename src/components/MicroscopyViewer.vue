@@ -157,9 +157,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { fabric } from 'fabric'
-import panzoom, { type PanZoom } from 'panzoom'
+import { ref, onMounted, watch } from 'vue'
 import axios from 'axios'
 
 interface MicroscopyImage {
@@ -195,8 +193,8 @@ const emit = defineEmits<{
 // Refs
 const canvasContainer = ref<HTMLDivElement>()
 const fabricCanvas = ref<HTMLCanvasElement>()
-let canvas: fabric.Canvas | null = null
-let panZoomInstance: PanZoom | null = null
+let ctx: CanvasRenderingContext2D | null = null
+let backgroundImage: HTMLImageElement | null = null
 
 // State
 const loading = ref(true)
@@ -207,33 +205,20 @@ const selectedColor = ref('#FF5722')
 const showSidebar = ref(true)
 const selectedAnnotation = ref<ImageAnnotation | null>(null)
 
+let scale = 1
+let offsetX = 0
+let offsetY = 0
+
 // Lifecycle
 onMounted(async () => {
   await loadImage()
   initCanvas()
 })
 
-onUnmounted(() => {
-  if (canvas) {
-    canvas.dispose()
-  }
-  if (panZoomInstance) {
-    panZoomInstance.dispose()
-  }
-})
-
 // Watch tool changes
 watch(selectedTool, (newTool) => {
-  if (!canvas) return
-
-  canvas.isDrawingMode = newTool === 'freehand'
-  canvas.selection = newTool === 'select'
-
-  if (newTool === 'select') {
-    canvas.defaultCursor = 'default'
-  } else {
-    canvas.defaultCursor = 'crosshair'
-  }
+  if (!fabricCanvas.value) return
+  fabricCanvas.value.style.cursor = newTool === 'select' ? 'default' : 'crosshair'
 })
 
 // Methods
@@ -254,157 +239,160 @@ async function loadImage() {
 function initCanvas() {
   if (!fabricCanvas.value || !canvasContainer.value || !image.value) return
 
-  // Criar canvas
-  canvas = new fabric.Canvas(fabricCanvas.value, {
-    width: canvasContainer.value.clientWidth,
-    height: 600,
-    backgroundColor: '#000000',
-  })
+  const canvas = fabricCanvas.value
+  ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  canvas.width = canvasContainer.value.clientWidth
+  canvas.height = 600
 
   // Carregar imagem de fundo
-  fabric.Image.fromURL(image.value.fileUrl, (img) => {
-    if (!canvas) return
-
-    const scale = Math.min(
-      canvas.width! / img.width!,
-      canvas.height! / img.height!
-    )
-
-    img.scale(scale)
-    img.set({
-      left: (canvas.width! - img.width! * scale) / 2,
-      top: (canvas.height! - img.height! * scale) / 2,
-      selectable: false,
-      evented: false,
-    })
-
-    canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas))
-
-    // Carregar anotações existentes
-    loadAnnotations()
-  })
+  backgroundImage = new Image()
+  backgroundImage.crossOrigin = 'anonymous'
+  backgroundImage.onload = () => {
+    drawCanvas()
+  }
+  backgroundImage.src = image.value.fileUrl
 
   // Event listeners
-  canvas.on('mouse:down', handleMouseDown)
-  canvas.on('mouse:move', handleMouseMove)
-  canvas.on('mouse:up', handleMouseUp)
-  canvas.on('object:modified', handleObjectModified)
+  canvas.addEventListener('mousedown', handleMouseDown)
+  canvas.addEventListener('mousemove', handleMouseMove)
+  canvas.addEventListener('mouseup', handleMouseUp)
+}
+
+function drawCanvas() {
+  if (!ctx || !fabricCanvas.value || !backgroundImage) return
+
+  ctx.clearRect(0, 0, fabricCanvas.value.width, fabricCanvas.value.height)
+  ctx.fillStyle = '#000000'
+  ctx.fillRect(0, 0, fabricCanvas.value.width, fabricCanvas.value.height)
+
+  // Desenhar imagem de fundo
+  if (backgroundImage.complete) {
+    const imgScale = Math.min(
+      fabricCanvas.value.width / backgroundImage.width,
+      fabricCanvas.value.height / backgroundImage.height
+    ) * scale
+
+    const imgWidth = backgroundImage.width * imgScale
+    const imgHeight = backgroundImage.height * imgScale
+    const x = (fabricCanvas.value.width - imgWidth) / 2 + offsetX
+    const y = (fabricCanvas.value.height - imgHeight) / 2 + offsetY
+
+    ctx.drawImage(backgroundImage, x, y, imgWidth, imgHeight)
+  }
+
+  // Desenhar anotações
+  annotations.value.forEach((annotation) => {
+    drawAnnotation(annotation)
+  })
+}
+
+function drawAnnotation(annotation: ImageAnnotation) {
+  if (!ctx) return
+
+  ctx.strokeStyle = annotation.color
+  ctx.lineWidth = 2
+  ctx.globalAlpha = annotation.opacity
+
+  const data = annotation.data
+
+  switch (annotation.type) {
+    case 'circle':
+      ctx.beginPath()
+      ctx.arc(data.x, data.y, data.radius, 0, 2 * Math.PI)
+      ctx.stroke()
+      break
+
+    case 'rectangle':
+      ctx.strokeRect(data.x, data.y, data.width, data.height)
+      break
+
+    case 'arrow':
+      ctx.beginPath()
+      ctx.moveTo(data.x1, data.y1)
+      ctx.lineTo(data.x2, data.y2)
+      ctx.stroke()
+      break
+  }
+
+  ctx.globalAlpha = 1
 }
 
 let isDrawing = false
 let startX = 0
 let startY = 0
-let currentShape: fabric.Object | null = null
+let currentAnnotation: Partial<ImageAnnotation> | null = null
 
-function handleMouseDown(e: fabric.IEvent) {
-  if (!canvas || selectedTool.value === 'select') return
+function handleMouseDown(e: MouseEvent) {
+  if (!fabricCanvas.value || selectedTool.value === 'select') return
 
-  const pointer = canvas.getPointer(e.e)
+  const rect = fabricCanvas.value.getBoundingClientRect()
+  startX = e.clientX - rect.left
+  startY = e.clientY - rect.top
   isDrawing = true
-  startX = pointer.x
-  startY = pointer.y
 
-  switch (selectedTool.value) {
-    case 'circle':
-      currentShape = new fabric.Circle({
-        left: startX,
-        top: startY,
-        radius: 1,
-        fill: 'transparent',
-        stroke: selectedColor.value,
-        strokeWidth: 2,
-      })
-      canvas.add(currentShape)
-      break
-
-    case 'rectangle':
-      currentShape = new fabric.Rect({
-        left: startX,
-        top: startY,
-        width: 1,
-        height: 1,
-        fill: 'transparent',
-        stroke: selectedColor.value,
-        strokeWidth: 2,
-      })
-      canvas.add(currentShape)
-      break
-
-    case 'arrow':
-      currentShape = new fabric.Line([startX, startY, startX, startY], {
-        stroke: selectedColor.value,
-        strokeWidth: 2,
-      })
-      canvas.add(currentShape)
-      break
+  currentAnnotation = {
+    id: `temp-${Date.now()}`,
+    type: selectedTool.value,
+    color: selectedColor.value,
+    opacity: 0.7,
+    data: {},
   }
 }
 
-function handleMouseMove(e: fabric.IEvent) {
-  if (!canvas || !isDrawing || !currentShape) return
+function handleMouseMove(e: MouseEvent) {
+  if (!fabricCanvas.value || !isDrawing || !currentAnnotation) return
 
-  const pointer = canvas.getPointer(e.e)
+  const rect = fabricCanvas.value.getBoundingClientRect()
+  const currentX = e.clientX - rect.left
+  const currentY = e.clientY - rect.top
 
   switch (selectedTool.value) {
     case 'circle':
       const radius = Math.sqrt(
-        Math.pow(pointer.x - startX, 2) + Math.pow(pointer.y - startY, 2)
+        Math.pow(currentX - startX, 2) + Math.pow(currentY - startY, 2)
       )
-      ;(currentShape as fabric.Circle).set({ radius })
+      currentAnnotation.data = { x: startX, y: startY, radius }
       break
 
     case 'rectangle':
-      const width = pointer.x - startX
-      const height = pointer.y - startY
-      ;(currentShape as fabric.Rect).set({ width, height })
+      currentAnnotation.data = {
+        x: startX,
+        y: startY,
+        width: currentX - startX,
+        height: currentY - startY,
+      }
       break
 
     case 'arrow':
-      ;(currentShape as fabric.Line).set({ x2: pointer.x, y2: pointer.y })
+      currentAnnotation.data = {
+        x1: startX,
+        y1: startY,
+        x2: currentX,
+        y2: currentY,
+      }
       break
   }
 
-  canvas.renderAll()
+  drawCanvas()
+  if (currentAnnotation.data) {
+    drawAnnotation(currentAnnotation as ImageAnnotation)
+  }
 }
 
 function handleMouseUp() {
-  if (!canvas || !currentShape) return
+  if (!isDrawing || !currentAnnotation) return
 
   isDrawing = false
 
-  // Adicionar à lista de anotações
-  const annotation: ImageAnnotation = {
-    id: Date.now().toString(),
-    type: selectedTool.value,
-    data: currentShape.toJSON(),
-    color: selectedColor.value,
-    opacity: 0.7,
+  if (currentAnnotation.data) {
+    annotations.value.push(currentAnnotation as ImageAnnotation)
   }
 
-  annotations.value.push(annotation)
-  currentShape = null
-
-  // Voltar para modo select
+  currentAnnotation = null
   selectedTool.value = 'select'
-}
-
-function handleObjectModified(e: fabric.IEvent) {
-  // Atualizar anotação quando modificada
-  console.log('Object modified:', e.target)
-}
-
-function loadAnnotations() {
-  if (!canvas) return
-
-  annotations.value.forEach((annotation) => {
-    // Reconstruir objetos fabric a partir dos dados salvos
-    fabric.util.enlivenObjects([annotation.data], (objects) => {
-      objects.forEach((obj) => {
-        canvas?.add(obj)
-      })
-      canvas?.renderAll()
-    })
-  })
+  drawCanvas()
 }
 
 function selectAnnotation(annotation: ImageAnnotation) {
@@ -413,11 +401,12 @@ function selectAnnotation(annotation: ImageAnnotation) {
 
 async function deleteAnnotation(annotation: ImageAnnotation) {
   try {
-    await axios.delete(`/api/microscopy/${props.imageId}/annotations/${annotation.id}`)
-    annotations.value = annotations.value.filter((a) => a.id !== annotation.id)
+    if (!annotation.id.startsWith('temp-')) {
+      await axios.delete(`/api/microscopy/${props.imageId}/annotations/${annotation.id}`)
+    }
 
-    // Remover do canvas também
-    // TODO: implementar
+    annotations.value = annotations.value.filter((a) => a.id !== annotation.id)
+    drawCanvas()
 
     if (selectedAnnotation.value?.id === annotation.id) {
       selectedAnnotation.value = null
@@ -432,9 +421,9 @@ async function saveAnnotations() {
   try {
     loading.value = true
 
-    // Salvar cada anotação
+    // Salvar cada anotação nova
     for (const annotation of annotations.value) {
-      if (!annotation.id.startsWith('temp-')) continue // Já salva
+      if (!annotation.id.startsWith('temp-')) continue
 
       await axios.post(`/api/microscopy/${props.imageId}/annotations`, annotation)
     }
@@ -459,21 +448,20 @@ function getAnnotationIcon(type: string) {
 }
 
 function zoomIn() {
-  if (!canvas) return
-  const zoom = canvas.getZoom()
-  canvas.setZoom(zoom * 1.1)
+  scale *= 1.1
+  drawCanvas()
 }
 
 function zoomOut() {
-  if (!canvas) return
-  const zoom = canvas.getZoom()
-  canvas.setZoom(zoom / 1.1)
+  scale /= 1.1
+  drawCanvas()
 }
 
 function resetZoom() {
-  if (!canvas) return
-  canvas.setZoom(1)
-  canvas.absolutePan({ x: 0, y: 0 })
+  scale = 1
+  offsetX = 0
+  offsetY = 0
+  drawCanvas()
 }
 </script>
 
