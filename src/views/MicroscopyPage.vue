@@ -171,11 +171,25 @@
               label="Paciente"
               variant="outlined"
               :rules="[v => !!v || 'Paciente obrigatório']"
-              :loading="patients.length === 0"
-              :no-data-text="patients.length === 0 ? 'Carregando pacientes...' : 'Nenhum paciente encontrado'"
+              :loading="patientsLoading"
+              :no-data-text="patientsLoading ? 'Carregando pacientes...' : 'Nenhum paciente encontrado'"
               clearable
               class="mb-4"
-            />
+            >
+              <template v-slot:append-inner>
+                <v-tooltip text="Recarregar pacientes">
+                  <template v-slot:activator="{ props }">
+                    <v-btn
+                      v-bind="props"
+                      icon="mdi-refresh"
+                      size="x-small"
+                      variant="text"
+                      @click="loadPatients"
+                    />
+                  </template>
+                </v-tooltip>
+              </template>
+            </v-autocomplete>
 
             <v-select
               v-model="uploadData.analysisType"
@@ -256,6 +270,7 @@ interface Patient {
 const search = ref('')
 const filterType = ref<string | null>(null)
 const loading = ref(true)
+const patientsLoading = ref(false)
 const images = ref<MicroscopyImage[]>([])
 const patients = ref<Patient[]>([])
 
@@ -327,10 +342,23 @@ async function loadImages() {
 
 async function loadPatients() {
   try {
+    patientsLoading.value = true
+    console.log('🔍 Carregando pacientes...')
     const response = await axios.get('/api/patients')
+    console.log('✅ Pacientes carregados:', response.data)
     patients.value = response.data
-  } catch (error) {
-    console.error('Erro ao carregar pacientes:', error)
+    console.log('📊 Total de pacientes:', patients.value.length)
+  } catch (error: any) {
+    console.error('❌ Erro ao carregar pacientes:', error)
+    console.error('Detalhes do erro:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    })
+    // Mostrar alerta para o usuário
+    alert('Erro ao carregar pacientes. Verifique o console para mais detalhes.')
+  } finally {
+    patientsLoading.value = false
   }
 }
 
