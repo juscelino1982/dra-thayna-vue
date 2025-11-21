@@ -138,29 +138,36 @@
           </v-card-text>
 
           <v-card-actions>
-            <v-btn size="small" variant="text" @click.stop="openViewer(image)">
-              Visualizar
+            <v-btn
+              color="primary"
+              variant="tonal"
+              prepend-icon="mdi-eye"
+              @click.stop="openViewer(image)"
+              block
+            >
+              Visualizar Imagem
+            </v-btn>
+          </v-card-actions>
+
+          <v-card-actions class="pt-0">
+            <v-btn
+              size="small"
+              variant="text"
+              prepend-icon="mdi-pencil"
+              @click.stop="editImage(image)"
+            >
+              Editar
             </v-btn>
             <v-spacer />
-            <v-menu>
-              <template v-slot:activator="{ props }">
-                <v-btn icon="mdi-dots-vertical" size="small" v-bind="props" @click.stop />
-              </template>
-              <v-list>
-                <v-list-item @click="editImage(image)">
-                  <template v-slot:prepend>
-                    <v-icon>mdi-pencil</v-icon>
-                  </template>
-                  <v-list-item-title>Editar</v-list-item-title>
-                </v-list-item>
-                <v-list-item @click="deleteImage(image)">
-                  <template v-slot:prepend>
-                    <v-icon color="error">mdi-delete</v-icon>
-                  </template>
-                  <v-list-item-title class="text-error">Deletar</v-list-item-title>
-                </v-list-item>
-              </v-list>
-            </v-menu>
+            <v-btn
+              size="small"
+              variant="text"
+              color="error"
+              prepend-icon="mdi-delete"
+              @click.stop="deleteImage(image)"
+            >
+              Deletar
+            </v-btn>
           </v-card-actions>
         </v-card>
       </v-col>
@@ -437,9 +444,15 @@ function resetUploadForm() {
 
 function openViewer(image: MicroscopyImage) {
   console.log('🖼️ Abrindo visualizador para imagem:', image)
+  console.log('📋 ID da imagem:', image.id)
+  console.log('🔗 URL da imagem:', image.fileUrl)
+
   selectedImage.value = image
   viewerDialog.value = true
-  console.log('✅ Dialog aberto:', viewerDialog.value)
+
+  console.log('✅ selectedImage definido:', selectedImage.value)
+  console.log('✅ viewerDialog aberto:', viewerDialog.value)
+  console.log('🎯 MicroscopyViewer será renderizado com imageId:', image.id)
 }
 
 function editImage(image: MicroscopyImage) {
